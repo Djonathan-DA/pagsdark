@@ -1,0 +1,78 @@
+# Projeto Dark
+
+Plataforma **local** (roda no seu Mac) com **duas funções**, nada além disso:
+
+1. **Edição de vídeo em massa** — você joga um *molde* (arte PNG 9:16 com uma área
+   transparente onde o vídeo entra) + uma pasta de vídeos. O sistema recorta cada
+   vídeo na área do molde, sobrepõe a arte, e gera todos em lote (9:16). Saída:
+   **baixar em ZIP** ou **enviar para a biblioteca** do agendador.
+2. **Agendamento automático de posts** — vincule contas (estilo "BM": workspaces) de
+   **Kwai, TikTok, Instagram e YouTube Shorts** e crie **Campanhas**: escolha um lote
+   de vídeos, as contas, "X posts por dia" e os horários fixos (08h, 10h, 12h…). O
+   sistema distribui tudo pelo mês e **posta sozinho** enquanto o app estiver rodando.
+
+> Fora de escopo de propósito: qualquer terceira função, edição avançada, analytics.
+
+---
+
+## Como rodar
+
+```bash
+npm install
+cp .env.example .env     # e preencha as credenciais (veja README.md)
+npm start                # abre em http://localhost:4310
+```
+
+O app precisa ficar **aberto** para os agendamentos dispararem (é um worker local).
+
+---
+
+## Mapa do projeto (onde está cada coisa)
+
+```
+src/
+  server.js            Sobe o Express, serve a UI e liga o worker do agendador
+  config.js            Lê o .env (porta, chaves, credenciais)
+  db.js                Banco SQLite (tabelas) + funções de acesso
+  ffmpeg.js            Aponta o fluent-ffmpeg para os binários estáticos
+  crypto.js            Cifra/decifra os tokens das contas
+
+  editor/              FUNÇÃO 1 — edição em massa
+    mold.js              Detecta a área transparente do molde PNG (onde o vídeo entra)
+    render.js            Renderiza 1 vídeo dentro do molde (filtro ffmpeg)
+    batch.js             Roda a renderização em lote, com progresso
+
+  scheduler/           FUNÇÃO 2 — agendamento
+    queue.js             CRUD de posts agendados
+    campaign.js          Gera a campanha do mês (X/dia nos horários fixos)
+    worker.js            A cada minuto, posta o que venceu
+
+  platforms/           Integração com cada rede
+    youtube.js           OAuth + upload (Shorts)
+    instagram.js         OAuth + Reels (precisa de URL pública -> túnel)
+    tiktok.js            OAuth + envio de arquivo (rascunho/privado até auditar)
+    kwai.js              Sem API: exporta o vídeo para postar manual
+  tunnel.js            Sobe um túnel temporário (cloudflared) p/ o Instagram
+
+  routes/              Endpoints HTTP usados pela interface
+    accounts.js          Workspaces + contas + callbacks de OAuth
+    editor.js            Upload de molde/vídeos, renderização, download/export
+    schedule.js          Campanhas, calendário e posts
+
+public/                A interface (HTML/CSS/JS puro, tema escuro)
+data/                  (não vai pro git) banco + vídeos + saídas
+```
+
+## Banco de dados (tabelas)
+
+`workspaces`, `accounts`, `molds`, `media_assets`, `render_jobs`, `render_items`,
+`campaigns`, `posts`. Schema em `src/db.js`.
+
+## O que funciona hoje vs. depende de aprovação
+
+- **Edição em massa** e **YouTube Shorts**: funcionam hoje.
+- **Instagram Reels**: hoje, **se** a conta for Profissional ligada a uma Página.
+- **TikTok**: posta como rascunho/privado até o app ser auditado pela TikTok.
+- **Kwai**: sem API — exporta para pasta e você posta manual.
+
+Detalhes e passo a passo das contas de desenvolvedor: ver `README.md`.

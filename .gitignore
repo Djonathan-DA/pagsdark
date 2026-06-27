@@ -1,0 +1,12 @@
+# Dependencias
+node_modules/
+
+# Segredos
+.env
+
+# Dados locais (banco + midias). Nada disso vai pro git.
+data/
+
+# Sistema
+.DS_Store
+*.log
