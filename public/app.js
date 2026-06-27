@@ -19,13 +19,21 @@ function toast(msg, type = '') {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 4000);
 }
+function platIcon(p) { return { youtube: '▶️', instagram: '📷', facebook: '📘', tiktok: '🎵' }[p] || '•'; }
+
 const state = {
   selMold: null,
   selSources: new Set(),
   selLib: new Set(),
   selAccounts: new Set(),
   workspaces: [],
+  molds: [],
+  sourcesArr: [],
+  focusX: 50, focusY: 50, sampleIdx: 0,
+  activeWs: null,
+  settings: null,
 };
+let PLATFORMS = [];
 
 // ===== Tabs =====
 $$('nav button').forEach((b) => b.onclick = () => {
@@ -33,23 +41,24 @@ $$('nav button').forEach((b) => b.onclick = () => {
   $$('.tab').forEach((t) => t.classList.toggle('active', t.id === `tab-${b.dataset.tab}`));
   if (b.dataset.title) $('#pageTitle').textContent = b.dataset.title;
   if (b.dataset.sub) $('#pageSub').textContent = b.dataset.sub;
-  if (b.dataset.tab === 'contas') { loadWorkspaces(); loadSettings(); }
-  if (b.dataset.tab === 'agendar') { refreshScheduleTab(); }
+  if (b.dataset.tab === 'contas') loadContas();
+  if (b.dataset.tab === 'agendar') refreshScheduleTab();
 });
 
 // ===================== EDITOR =====================
 async function loadMolds() {
-  const molds = await api('GET', '/api/editor/molds');
+  state.molds = await api('GET', '/api/editor/molds');
   const box = $('#moldList');
   box.innerHTML = '';
-  molds.forEach((m) => {
+  state.molds.forEach((m) => {
     const d = document.createElement('div');
     d.className = 'thumb' + (state.selMold === m.id ? ' sel' : '');
     d.innerHTML = `<img src="/mold-file/${m.id}" /><span class="tag">${m.canvas_w}×${m.canvas_h}</span>
       <span class="pick">✓</span><span class="name">${m.name}</span>`;
-    d.onclick = () => { state.selMold = state.selMold === m.id ? null : m.id; loadMolds(); };
+    d.onclick = () => { state.selMold = state.selMold === m.id ? null : m.id; loadMolds(); refreshPreview(); };
     box.appendChild(d);
   });
+  refreshPreview();
 }
 $('#moldUpload').onclick = async () => {
   const f = $('#moldFile').files[0];
@@ -60,18 +69,20 @@ $('#moldUpload').onclick = async () => {
 };
 
 async function loadSources() {
-  const src = await api('GET', '/api/editor/sources');
+  state.sourcesArr = await api('GET', '/api/editor/sources');
+  const src = state.sourcesArr;
   $('#sourceCount').textContent = src.length
     ? `${src.length} vídeo(s) carregado(s). Selecione alguns ou deixe sem seleção para usar todos.`
     : 'Nenhum vídeo carregado.';
   const box = $('#sourceList');
   box.innerHTML = '';
-  src.slice(0, MAX_THUMBS).forEach((m) => box.appendChild(mediaThumb(m, state.selSources, loadSources)));
+  src.slice(0, MAX_THUMBS).forEach((m) => box.appendChild(mediaThumb(m, state.selSources, () => { loadSources(); })));
   if (src.length > MAX_THUMBS) {
     const more = document.createElement('p'); more.className = 'muted';
-    more.textContent = `+${src.length - MAX_THUMBS} vídeos não exibidos (serão incluídos se nada estiver selecionado).`;
+    more.textContent = `+${src.length - MAX_THUMBS} vídeos não exibidos (incluídos se nada estiver selecionado).`;
     box.appendChild(more);
   }
+  refreshPreview();
 }
 function mediaThumb(m, selSet, reload) {
   const d = document.createElement('div');
@@ -94,10 +105,71 @@ $('#folderImport').onclick = async () => {
   try { const r = await api('POST', '/api/editor/sources/import-folder', { folder }); toast(`${r.imported} vídeo(s) importados`, 'ok'); await loadSources(); }
   catch (e) { toast(e.message, 'err'); }
 };
+
+// ---- Preview interativo (canvas) ----
+const pv = { moldId: null, sampleId: null, img: null, video: null, imgReady: false, vidReady: false };
+function currentMold() { return state.molds.find((m) => m.id === state.selMold) || null; }
+function currentSample() {
+  const list = state.selSources.size ? state.sourcesArr.filter((s) => state.selSources.has(s.id)) : state.sourcesArr;
+  if (!list.length) return null;
+  return list[state.sampleIdx % list.length];
+}
+function refreshPreview() {
+  const canvas = $('#previewCanvas'); if (!canvas) return;
+  const hint = $('#previewHint');
+  const mold = currentMold(), sample = currentSample();
+  if (!mold || !sample) {
+    if (hint) hint.style.display = '';
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+  if (hint) hint.style.display = 'none';
+  const W = 240, s = W / mold.canvas_w;
+  canvas.width = W; canvas.height = Math.round(mold.canvas_h * s);
+  if (pv.moldId !== mold.id) {
+    pv.moldId = mold.id; pv.imgReady = false; pv.img = new Image();
+    pv.img.onload = () => { pv.imgReady = true; drawPreview(); };
+    pv.img.src = '/mold-file/' + mold.id;
+  }
+  if (pv.sampleId !== sample.id) {
+    pv.sampleId = sample.id; pv.vidReady = false;
+    if (!pv.video) { pv.video = document.createElement('video'); pv.video.muted = true; pv.video.playsInline = true; }
+    pv.video.onloadeddata = () => { try { pv.video.currentTime = Math.min(1, (pv.video.duration || 2) / 2); } catch (e) {} };
+    pv.video.onseeked = () => { pv.vidReady = true; drawPreview(); };
+    pv.video.src = '/preview/' + sample.id; pv.video.load();
+  }
+  drawPreview();
+}
+function drawPreview() {
+  const canvas = $('#previewCanvas'); if (!canvas) return;
+  const mold = currentMold(); if (!mold) return;
+  const ctx = canvas.getContext('2d');
+  const s = canvas.width / mold.canvas_w;
+  const ax = mold.area_x * s, ay = mold.area_y * s, aw = mold.area_w * s, ah = mold.area_h * s;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000'; ctx.fillRect(ax, ay, aw, ah);
+  if (pv.vidReady && pv.video.videoWidth) {
+    const vw = pv.video.videoWidth, vh = pv.video.videoHeight;
+    const cover = Math.max(aw / vw, ah / vh), dw = vw * cover, dh = vh * cover;
+    const offX = (dw - aw) * (state.focusX / 100), offY = (dh - ah) * (state.focusY / 100);
+    ctx.save(); ctx.beginPath(); ctx.rect(ax, ay, aw, ah); ctx.clip();
+    ctx.drawImage(pv.video, ax - offX, ay - offY, dw, dh);
+    ctx.restore();
+  }
+  if (pv.imgReady) ctx.drawImage(pv.img, 0, 0, canvas.width, canvas.height);
+}
+$('#focusX').oninput = (e) => { state.focusX = +e.target.value; drawPreview(); };
+$('#focusY').oninput = (e) => { state.focusY = +e.target.value; drawPreview(); };
+$('#sampleNext').onclick = () => { state.sampleIdx++; refreshPreview(); };
+$('#centerFocus').onclick = () => { state.focusX = 50; state.focusY = 50; $('#focusX').value = 50; $('#focusY').value = 50; drawPreview(); };
+
 $('#renderBtn').onclick = async () => {
   if (!state.selMold) return toast('Selecione um molde.', 'err');
   try {
-    const { jobId } = await api('POST', '/api/editor/render', { moldId: state.selMold, sourceIds: [...state.selSources] });
+    const { jobId } = await api('POST', '/api/editor/render', {
+      moldId: state.selMold, sourceIds: [...state.selSources],
+      focusX: state.focusX, focusY: state.focusY,
+    });
     $('#renderProgress').classList.remove('hide');
     $('#downloadZip').href = `/api/editor/job/${jobId}/zip`;
     pollJob(jobId);
@@ -117,76 +189,145 @@ async function pollJob(jobId) {
 }
 $('#goSchedule').onclick = () => $$('nav button').find((b) => b.dataset.tab === 'agendar').click();
 
-// ===================== CONTAS =====================
-let PLATFORMS = [];
-async function loadWorkspaces() {
+// ===================== CONTAS (guiado) =====================
+const GUIDES = {
+  youtube: {
+    icon: '▶️', title: 'YouTube Shorts', fields: [['youtubeClientId', 'Client ID'], ['youtubeClientSecret', 'Client Secret']],
+    steps: [
+      'Acesse o <b>Google Cloud Console</b> (console.cloud.google.com) e crie um projeto.',
+      'Ative a API <b>YouTube Data API v3</b>.',
+      'Tela de consentimento OAuth → modo <b>Testing</b> → adicione seu e-mail como tester.',
+      'Em Credenciais, crie um <b>OAuth Client ID</b> (tipo <i>Web application</i>) e cole o Redirect URI abaixo.',
+      'Copie o Client ID e o Client Secret nos campos abaixo e clique em Salvar.',
+    ],
+  },
+  instagram: {
+    icon: '📷', title: 'Instagram Reels', fields: [['metaAppId', 'Meta App ID'], ['metaAppSecret', 'Meta App Secret']],
+    steps: [
+      'Sua conta IG precisa ser <b>Profissional</b> (Business/Creator) e ligada a uma <b>Página do Facebook</b>.',
+      'Em <b>developers.facebook.com</b>, crie um app do tipo <i>Business</i>.',
+      'Adicione os produtos <b>Instagram Graph API</b> e <b>Facebook Login</b>.',
+      'No Facebook Login, cole o Redirect URI abaixo em "Valid OAuth Redirect URIs".',
+      'Copie o App ID e o App Secret abaixo e salve. <b>(As mesmas credenciais valem para o Facebook.)</b>',
+    ],
+  },
+  facebook: {
+    icon: '📘', title: 'Facebook (Página)', fields: [['metaAppId', 'Meta App ID'], ['metaAppSecret', 'Meta App Secret']],
+    steps: [
+      'Use o <b>mesmo app do Meta</b> criado para o Instagram (mesmas credenciais).',
+      'Garanta as permissões <b>pages_manage_posts</b> e <b>publish_video</b>.',
+      'No Facebook Login, cole o Redirect URI abaixo.',
+      'Você precisa <b>administrar uma Página</b> — o vídeo é publicado nela.',
+      'Confirme App ID e Secret abaixo e salve.',
+    ],
+  },
+  tiktok: {
+    icon: '🎵', title: 'TikTok', fields: [['tiktokClientKey', 'Client Key'], ['tiktokClientSecret', 'Client Secret']],
+    steps: [
+      'Em <b>developers.tiktok.com</b>, crie um app.',
+      'Adicione <b>Login Kit</b> e <b>Content Posting API</b>.',
+      'Cole o Redirect URI abaixo nas configurações do app.',
+      'Copie o Client Key e o Client Secret abaixo e salve.',
+      '⚠️ Enquanto o app não for auditado, o TikTok só aceita posts <b>privados/rascunho</b>.',
+    ],
+  },
+};
+function credVal(k) {
+  const s = state.settings; if (!s) return '';
+  return ({
+    youtubeClientId: s.youtube.clientId, youtubeClientSecret: s.youtube.clientSecret,
+    metaAppId: s.meta.appId, metaAppSecret: s.meta.appSecret,
+    tiktokClientKey: s.tiktok.clientKey, tiktokClientSecret: s.tiktok.clientSecret,
+  })[k] || '';
+}
+async function loadContas() {
   PLATFORMS = await api('GET', '/platforms');
   state.workspaces = await api('GET', '/workspaces');
+  state.settings = await api('GET', '/settings');
+  if (!state.activeWs && state.workspaces.length) state.activeWs = state.workspaces[0].id;
+  renderWorkspaces();
+  renderGuides();
+}
+function renderWorkspaces() {
   const box = $('#wsList');
-  box.innerHTML = '';
   if (!state.workspaces.length) { box.innerHTML = '<p class="muted">Nenhum workspace ainda. Crie o primeiro acima.</p>'; return; }
-  state.workspaces.forEach((w) => box.appendChild(workspaceCard(w)));
+  box.innerHTML = '';
+  state.workspaces.forEach((w) => {
+    const d = document.createElement('div');
+    d.className = 'ws-item' + (w.id === state.activeWs ? ' active' : '');
+    d.innerHTML = `<span>${w.id === state.activeWs ? '<span class="star">★</span> ' : ''}<b>${w.name}</b>
+      <span class="muted">· ${w.accounts.length} conta(s)</span></span>
+      <button class="btn sm ghost" onclick="event.stopPropagation();delWorkspace(${w.id})">Excluir</button>`;
+    d.onclick = () => { state.activeWs = w.id; renderWorkspaces(); renderGuides(); };
+    box.appendChild(d);
+  });
 }
-function workspaceCard(w) {
-  const c = document.createElement('div');
-  c.className = 'card'; c.style.background = 'var(--bg2)';
-  const accs = w.accounts.map((a) =>
-    `<span class="chip ok">${platIcon(a.platform)} ${a.display_name}
-      <button class="btn sm ghost" style="padding:0 6px" onclick="delAccount(${a.id})">✕</button></span>`).join(' ');
-  const connectBtns = PLATFORMS.map((p) => {
-    if (p.manual) return `<button class="btn sm ghost" onclick="connectManual(${w.id},'${p.name}')">+ ${p.label}</button>`;
-    const dis = p.configured ? '' : 'disabled title="Configure as credenciais"';
-    return `<button class="btn sm" ${dis} onclick="connectOAuth(${w.id},'${p.name}')">+ ${p.label}</button>`;
-  }).join(' ');
-  c.innerHTML = `<div class="row between"><b>${w.name}</b>
-    <button class="btn sm ghost" onclick="delWorkspace(${w.id})">Excluir</button></div>
-    <div class="row" style="margin:12px 0">${accs || '<span class="muted">Sem contas vinculadas</span>'}</div>
-    <div class="row">${connectBtns}</div>`;
-  return c;
+function renderGuides() {
+  const ws = state.workspaces.find((w) => w.id === state.activeWs);
+  $('#activeWsName').textContent = ws ? ws.name : '—';
+  const box = $('#platformGuides');
+  if (!ws) { $('#guidesHint').style.display = ''; box.innerHTML = ''; return; }
+  $('#guidesHint').style.display = 'none';
+  box.innerHTML = '';
+  PLATFORMS.forEach((p) => {
+    const g = GUIDES[p.name]; if (!g) return;
+    const connected = ws.accounts.filter((a) => a.platform === p.name);
+    const redir = (state.settings.redirectUris || {})[p.name] || '';
+    const fields = g.fields.map(([k, lbl]) =>
+      `<div><label>${lbl}</label><input data-key="${k}" value="${credVal(k)}" placeholder="(vazio)" /></div>`).join('');
+    const steps = g.steps.map((s) => `<li>${s}</li>`).join('');
+    const accs = connected.length
+      ? connected.map((a) => `<span class="chip ok">✓ ${a.display_name}
+          <button class="btn sm ghost" style="padding:0 6px" onclick="delAccount(${a.id})">✕</button></span>`).join(' ')
+      : '<span class="muted">Nenhuma conta conectada ainda.</span>';
+    const el = document.createElement('details');
+    el.className = 'guide'; el.dataset.platform = p.name;
+    el.innerHTML = `
+      <summary><span class="gi">${g.icon}</span> ${g.title}
+        ${p.configured ? '<span class="chip ok">credenciais ok</span>' : '<span class="chip warn">configure</span>'}
+        <span class="chev">▾</span></summary>
+      <div class="body">
+        <ol>${steps}</ol>
+        <label>Redirect URI — cole no painel da rede</label>
+        <div class="copy" onclick="copyText('${redir}', this)"><span class="t">${redir}</span> <span>⧉ copiar</span></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr; margin-top:12px">${fields}</div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn sm" onclick="saveCred('${p.name}', this)">Salvar credenciais</button>
+          <button class="btn sm ghost" onclick="connectOAuth(${ws.id},'${p.name}')" ${p.configured ? '' : 'disabled title=\"Salve as credenciais primeiro\"'}>Conectar conta</button>
+        </div>
+        <div class="row" style="margin-top:14px">${accs}</div>
+      </div>`;
+    box.appendChild(el);
+  });
 }
-function platIcon(p) { return { youtube: '▶️', instagram: '📷', tiktok: '🎵', kwai: '🟠' }[p] || '•'; }
 $('#wsCreate').onclick = async () => {
   const name = $('#wsName').value.trim();
   if (!name) return toast('Informe um nome.', 'err');
-  await api('POST', '/workspaces', { name }); $('#wsName').value = ''; loadWorkspaces();
+  const w = await api('POST', '/workspaces', { name });
+  $('#wsName').value = ''; state.activeWs = w.id; loadContas();
 };
-window.delWorkspace = async (id) => { if (confirm('Excluir workspace e suas contas?')) { await api('DELETE', '/workspaces/' + id); loadWorkspaces(); } };
-window.delAccount = async (id) => { await api('DELETE', '/accounts/' + id); loadWorkspaces(); };
-window.connectManual = async (wsId, platform) => {
-  const name = prompt('Nome dessa conta ' + platform + ':');
-  if (!name) return;
-  await api('POST', '/accounts/manual', { workspaceId: wsId, platform, displayName: name });
-  loadWorkspaces();
+window.delWorkspace = async (id) => { if (confirm('Excluir workspace e suas contas?')) { await api('DELETE', '/workspaces/' + id); if (state.activeWs === id) state.activeWs = null; loadContas(); } };
+window.delAccount = async (id) => { await api('DELETE', '/accounts/' + id); loadContas(); };
+window.saveCred = async (platform, btn) => {
+  const card = btn.closest('.guide');
+  const body = {};
+  $$('input[data-key]', card).forEach((inp) => { body[inp.dataset.key] = inp.value; });
+  await api('POST', '/settings', body);
+  toast('Credenciais salvas.', 'ok');
+  state.settings = await api('GET', '/settings');
+  PLATFORMS = await api('GET', '/platforms');
+  renderGuides();
 };
 window.connectOAuth = (wsId, platform) => {
-  window.open(`/oauth/${platform}/connect?workspaceId=${wsId}`, '_blank', 'width=620,height=720');
+  window.open(`/oauth/${platform}/connect?workspaceId=${wsId}`, '_blank', 'width=620,height=760');
 };
-window.addEventListener('message', (e) => { if (e.data === 'oauth-done') { toast('Conta conectada!', 'ok'); loadWorkspaces(); } });
-
-async function loadSettings() {
-  const s = await api('GET', '/settings');
-  $('#redirectNote').innerHTML = `<b>Redirect URIs</b> (cole no painel de cada rede):<br>
-    YouTube: <code>${s.redirectUris.youtube}</code><br>
-    Instagram: <code>${s.redirectUris.instagram}</code><br>
-    TikTok: <code>${s.redirectUris.tiktok}</code>`;
-  $('#settingsForm').innerHTML = `
-    ${field('YouTube Client ID', 'youtubeClientId', s.youtube.clientId)}
-    ${field('YouTube Client Secret', 'youtubeClientSecret', s.youtube.clientSecret)}
-    ${field('Meta App ID', 'metaAppId', s.meta.appId)}
-    ${field('Meta App Secret', 'metaAppSecret', s.meta.appSecret)}
-    ${field('TikTok Client Key', 'tiktokClientKey', s.tiktok.clientKey)}
-    ${field('TikTok Client Secret', 'tiktokClientSecret', s.tiktok.clientSecret)}`;
-}
-function field(label, id, val) {
-  return `<div><label>${label}</label><input id="set-${id}" value="${val || ''}" placeholder="(vazio)" /></div>`;
-}
-$('#saveSettings').onclick = async () => {
-  const body = {};
-  ['youtubeClientId', 'youtubeClientSecret', 'metaAppId', 'metaAppSecret', 'tiktokClientKey', 'tiktokClientSecret']
-    .forEach((id) => { body[id] = $('#set-' + id).value; });
-  await api('POST', '/settings', body);
-  toast('Credenciais salvas.', 'ok'); loadSettings(); loadWorkspaces();
+window.copyText = (t, el) => {
+  navigator.clipboard.writeText(t).then(() => {
+    const tag = el.querySelector('span:last-child');
+    if (tag) { tag.textContent = '✓ copiado'; setTimeout(() => tag.textContent = '⧉ copiar', 1500); }
+  });
 };
+window.addEventListener('message', (e) => { if (e.data === 'oauth-done') { toast('Conta conectada!', 'ok'); loadContas(); } });
 
 // ===================== AGENDAR =====================
 async function refreshScheduleTab() {
@@ -208,9 +349,8 @@ async function loadCampAccounts() {
   state.selAccounts.clear();
   $('#campAccounts').innerHTML = accs.length ? '' : '<span class="muted">Sem contas neste workspace.</span>';
   accs.forEach((a) => {
-    const id = 'acc-' + a.id;
     const l = document.createElement('label'); l.className = 'chip'; l.style.cursor = 'pointer';
-    l.innerHTML = `<input type="checkbox" id="${id}" /> ${platIcon(a.platform)} ${a.display_name}`;
+    l.innerHTML = `<input type="checkbox" /> ${platIcon(a.platform)} ${a.display_name}`;
     l.querySelector('input').onchange = (e) => { e.target.checked ? state.selAccounts.add(a.id) : state.selAccounts.delete(a.id); updateSummary(); };
     $('#campAccounts').appendChild(l);
   });

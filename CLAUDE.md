@@ -7,7 +7,7 @@ Plataforma **local** (roda no seu Mac) com **duas funções**, nada além disso:
    vídeo na área do molde, sobrepõe a arte, e gera todos em lote (9:16). Saída:
    **baixar em ZIP** ou **enviar para a biblioteca** do agendador.
 2. **Agendamento automático de posts** — vincule contas (estilo "BM": workspaces) de
-   **Kwai, TikTok, Instagram e YouTube Shorts** e crie **Campanhas**: escolha um lote
+   **YouTube Shorts, Instagram Reels, Facebook e TikTok** e crie **Campanhas**: escolha um lote
    de vídeos, as contas, "X posts por dia" e os horários fixos (08h, 10h, 12h…). O
    sistema distribui tudo pelo mês e **posta sozinho** enquanto o app estiver rodando.
 
@@ -50,8 +50,8 @@ src/
   platforms/           Integração com cada rede
     youtube.js           OAuth + upload (Shorts)
     instagram.js         OAuth + Reels (precisa de URL pública -> túnel)
+    facebook.js          OAuth + upload de vídeo na Página (Graph API)
     tiktok.js            OAuth + envio de arquivo (rascunho/privado até auditar)
-    kwai.js              Sem API: exporta o vídeo para postar manual
   tunnel.js            Sobe um túnel temporário (cloudflared) p/ o Instagram
 
   routes/              Endpoints HTTP usados pela interface
@@ -59,9 +59,22 @@ src/
     editor.js            Upload de molde/vídeos, renderização, download/export
     schedule.js          Campanhas, calendário e posts
 
-public/                A interface (HTML/CSS/JS puro, tema escuro)
-data/                  (não vai pro git) banco + vídeos + saídas
+public/                A interface (HTML/CSS/JS puro, tema escuro laranja)
+scripts/               install-daemon.sh / uninstall-daemon.sh (serviço de 2º plano)
+data/                  (não vai pro git) banco + vídeos + saídas + daemon.log
 ```
+
+## Rodar com o app fechado (daemon)
+
+`npm run daemon:install` registra um LaunchAgent (`com.pagsdark.server`) que mantém o
+servidor + agendador sempre rodando e inicia ao logar — assim os posts disparam mesmo
+com o navegador fechado. `npm run daemon:uninstall` remove. Logs em `data/daemon.log`.
+
+## Editor: posicionamento (pan)
+
+No passo 3 do Editor há um preview em canvas (molde + frame do vídeo) com sliders
+horizontal/vertical. O foco escolhido (`focusX`/`focusY`, 0–100) vai pro render e é
+aplicado no `crop` do ffmpeg para todos os vídeos do lote.
 
 ## Banco de dados (tabelas)
 
@@ -72,7 +85,7 @@ data/                  (não vai pro git) banco + vídeos + saídas
 
 - **Edição em massa** e **YouTube Shorts**: funcionam hoje.
 - **Instagram Reels**: hoje, **se** a conta for Profissional ligada a uma Página.
+- **Facebook**: hoje — publica vídeo numa Página que você administra (upload direto).
 - **TikTok**: posta como rascunho/privado até o app ser auditado pela TikTok.
-- **Kwai**: sem API — exporta para pasta e você posta manual.
 
 Detalhes e passo a passo das contas de desenvolvedor: ver `README.md`.

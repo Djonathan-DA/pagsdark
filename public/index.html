@@ -80,7 +80,26 @@
           </div>
 
           <div class="card">
-            <h3><span class="step-n">3</span> Renderizar</h3>
+            <h3><span class="step-n">3</span> Posicionar no molde</h3>
+            <p class="muted" id="previewHint" style="margin:0 0 16px">Selecione um molde e tenha um vídeo carregado para ver o preview e ajustar o enquadramento.</p>
+            <div class="row" style="align-items:flex-start; gap:26px">
+              <canvas id="previewCanvas" width="240" height="427" style="border-radius:12px; border:1px solid var(--line); background:#000"></canvas>
+              <div style="flex:1; min-width:240px">
+                <label>↔ Posição horizontal do vídeo</label>
+                <input type="range" id="focusX" min="0" max="100" value="50" />
+                <label>↕ Posição vertical do vídeo</label>
+                <input type="range" id="focusY" min="0" max="100" value="50" />
+                <div class="row" style="margin-top:8px">
+                  <button class="btn ghost sm" id="sampleNext">🔀 Trocar amostra</button>
+                  <button class="btn ghost sm" id="centerFocus">🎯 Centralizar</button>
+                </div>
+                <p class="note" style="margin-top:14px">Esse enquadramento (pan) vale para <b>todos</b> os vídeos do lote. Arraste as barras e veja o resultado ao vivo no preview.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3><span class="step-n">4</span> Renderizar</h3>
             <div class="row between">
               <span class="muted" id="renderHint">Selecione 1 molde acima. Sem seleção de vídeos, usa todos.</span>
               <button class="btn" id="renderBtn">Renderizar em lote ▶</button>
@@ -99,25 +118,24 @@
         <!-- ============ CONTAS ============ -->
         <section id="tab-contas" class="tab">
           <div class="hero">
-            <h2>Suas redes, organizadas 🔗</h2>
-            <p>Crie workspaces (como uma BM) e vincule Kwai, TikTok, Instagram e YouTube. Cada workspace agrupa as contas que você quer gerenciar junto.</p>
+            <h2>Conecte suas redes, passo a passo 🔗</h2>
+            <p>Crie um workspace (como uma BM), depois siga o guia de cada rede — YouTube, Instagram, Facebook e TikTok — para cadastrar as credenciais e conectar a conta.</p>
             <span class="big">🔗</span>
           </div>
 
           <div class="card">
-            <h3>Workspaces</h3>
+            <h3><span class="step-n">1</span> Escolha o workspace</h3>
             <div class="row">
               <input type="text" id="wsName" placeholder="Nome do workspace (ex.: Cliente A)" style="flex:1; min-width:240px" />
               <button class="btn" id="wsCreate">Criar workspace</button>
             </div>
-            <div id="wsList" style="margin-top:18px"></div>
+            <div id="wsList" style="margin-top:16px"></div>
           </div>
 
           <div class="card">
-            <h3>Configurações das APIs</h3>
-            <p class="note" id="redirectNote"></p>
-            <div id="settingsForm" class="grid" style="grid-template-columns:1fr 1fr; margin-top:14px"></div>
-            <div class="row" style="margin-top:14px"><button class="btn" id="saveSettings">Salvar credenciais</button></div>
+            <h3><span class="step-n">2</span> Conecte as redes a <span id="activeWsName" style="color:var(--orange2)">—</span></h3>
+            <p class="muted" id="guidesHint" style="margin:0 0 16px">Selecione um workspace acima para conectar as contas.</p>
+            <div id="platformGuides"></div>
           </div>
         </section>
 

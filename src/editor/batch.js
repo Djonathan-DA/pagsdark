@@ -10,7 +10,7 @@ import { probe } from '../ffmpeg.js';
 const CONCURRENCY = 2;
 
 // Cria o job e comeca a processar em background. Retorna o jobId na hora.
-export function startBatch({ moldId, sources }) {
+export function startBatch({ moldId, sources, focus }) {
   const mold = get('SELECT * FROM molds WHERE id = ?', [moldId]);
   if (!mold) throw new Error('Molde nao encontrado');
 
@@ -25,11 +25,11 @@ export function startBatch({ moldId, sources }) {
     insert('INSERT INTO render_items (job_id, source_path, status) VALUES (?,?,?)', [jobId, src, 'pending']);
   }
 
-  processJob(jobId, mold, outputDir); // nao espera (roda em background)
+  processJob(jobId, mold, outputDir, focus); // nao espera (roda em background)
   return jobId;
 }
 
-async function processJob(jobId, mold, outputDir) {
+async function processJob(jobId, mold, outputDir, focus) {
   const items = all('SELECT * FROM render_items WHERE job_id = ?', [jobId]);
   let index = 0;
 
@@ -39,7 +39,7 @@ async function processJob(jobId, mold, outputDir) {
       const base = path.parse(item.source_path).name.replace(/[^\w.-]/g, '_');
       const outPath = path.join(outputDir, `${base}_dark.mp4`);
       try {
-        await renderOne(item.source_path, mold, outPath);
+        await renderOne(item.source_path, mold, outPath, focus);
         const info = await probe(outPath).catch(() => ({}));
         insert(
           'INSERT INTO media_assets (kind, file_path, label, duration, width, height) VALUES (?,?,?,?,?,?)',

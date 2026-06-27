@@ -63,8 +63,8 @@ export function platformConfigured(platform) {
   switch (platform) {
     case 'youtube': return Boolean(config.youtube.clientId && config.youtube.clientSecret);
     case 'instagram': return Boolean(config.meta.appId && config.meta.appSecret);
+    case 'facebook': return Boolean(config.meta.appId && config.meta.appSecret);
     case 'tiktok': return Boolean(config.tiktok.clientKey && config.tiktok.clientSecret);
-    case 'kwai': return true; // manual, sempre "disponivel"
     default: return false;
   }
 }

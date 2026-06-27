@@ -64,6 +64,7 @@ router.get('/settings', (_req, res) => {
     redirectUris: {
       youtube: redirectUri('youtube'),
       instagram: redirectUri('instagram'),
+      facebook: redirectUri('facebook'),
       tiktok: redirectUri('tiktok'),
     },
     youtube: { clientId: config.youtube.clientId, clientSecret: mask(config.youtube.clientSecret) },

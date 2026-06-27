@@ -86,7 +86,7 @@ async function registerSource(filePath, label) {
 // ---- Renderizacao em lote ----
 router.post('/render', express.json(), (req, res) => {
   try {
-    const { moldId, sourceIds } = req.body;
+    const { moldId, sourceIds, focusX, focusY } = req.body;
     if (!moldId) return res.status(400).json({ error: 'Escolha um molde.' });
     const ids = Array.isArray(sourceIds) && sourceIds.length
       ? sourceIds
@@ -96,7 +96,7 @@ router.post('/render', express.json(), (req, res) => {
       .filter(Boolean)
       .map((r) => r.file_path);
     if (!sources.length) return res.status(400).json({ error: 'Nenhum video para renderizar.' });
-    const jobId = startBatch({ moldId, sources });
+    const jobId = startBatch({ moldId, sources, focus: { x: focusX, y: focusY } });
     res.json({ jobId });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });

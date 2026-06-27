@@ -3,13 +3,17 @@
 import { ffmpeg, probe } from '../ffmpeg.js';
 
 // mold = { file_path, canvas_w, canvas_h, area_x, area_y, area_w, area_h }
-export async function renderOne(sourceVideo, mold, outputPath) {
+// focus = { x, y } em 0..100 -> onde o video fica enquadrado na area (pan).
+export async function renderOne(sourceVideo, mold, outputPath, focus = {}) {
   const { duration } = await probe(sourceVideo);
   const dur = duration && duration > 0 ? duration : 60;
 
   const cw = mold.canvas_w, ch = mold.canvas_h;
   const aw = mold.area_w, ah = mold.area_h;
   const ax = mold.area_x, ay = mold.area_y;
+  const fnum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 50; }; // 0 e valido!
+  const fx = Math.min(1, Math.max(0, fnum(focus.x) / 100));
+  const fy = Math.min(1, Math.max(0, fnum(focus.y) / 100));
 
   return new Promise((resolve, reject) => {
     ffmpeg()
@@ -20,8 +24,8 @@ export async function renderOne(sourceVideo, mold, outputPath) {
         [
           // fundo preto do tamanho do canvas, com a duracao do video
           `color=c=black:s=${cw}x${ch}:r=30:d=${dur}[bg]`,
-          // video: escala para COBRIR a area e recorta o excesso (cover)
-          `[0:v]scale=${aw}:${ah}:force_original_aspect_ratio=increase,crop=${aw}:${ah},setsar=1,fps=30[vid]`,
+          // video: escala para COBRIR a area e recorta o excesso, com pan (foco)
+          `[0:v]scale=${aw}:${ah}:force_original_aspect_ratio=increase,crop=${aw}:${ah}:(iw-${aw})*${fx.toFixed(4)}:(ih-${ah})*${fy.toFixed(4)},setsar=1,fps=30[vid]`,
           // coloca o video na posicao da area
           `[bg][vid]overlay=${ax}:${ay}[tmp]`,
           // arte do molde por cima (o buraco transparente revela o video)

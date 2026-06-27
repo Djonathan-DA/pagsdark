@@ -9,7 +9,10 @@
   },
   "scripts": {
     "start": "node --no-warnings src/server.js",
-    "dev": "node --no-warnings --watch src/server.js"
+    "dev": "node --no-warnings --watch src/server.js",
+    "daemon:install": "bash scripts/install-daemon.sh",
+    "daemon:uninstall": "bash scripts/uninstall-daemon.sh",
+    "daemon:status": "launchctl list | grep com.pagsdark.server || echo 'daemon nao esta rodando'"
   },
   "dependencies": {
     "archiver": "^7.0.1",
