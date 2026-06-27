@@ -31,6 +31,8 @@ const state = {
 $$('nav button').forEach((b) => b.onclick = () => {
   $$('nav button').forEach((x) => x.classList.toggle('active', x === b));
   $$('.tab').forEach((t) => t.classList.toggle('active', t.id === `tab-${b.dataset.tab}`));
+  if (b.dataset.title) $('#pageTitle').textContent = b.dataset.title;
+  if (b.dataset.sub) $('#pageSub').textContent = b.dataset.sub;
   if (b.dataset.tab === 'contas') { loadWorkspaces(); loadSettings(); }
   if (b.dataset.tab === 'agendar') { refreshScheduleTab(); }
 });

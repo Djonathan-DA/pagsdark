@@ -128,8 +128,9 @@ router.get('/oauth/:platform/callback', async (req, res) => {
 
 // Pagina simples que avisa e fecha a aba do OAuth, atualizando a principal.
 function renderClose(message) {
-  return `<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;background:#0d0d12;color:#eee;padding:40px">
-  <h2>${message}</h2><p>Pode fechar esta aba.</p>
+  return `<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;background:#0c0a09;color:#fdf6ef;padding:48px;text-align:center">
+  <div style="font-size:46px">💸</div>
+  <h2 style="color:#ff7a18">${message}</h2><p style="color:#b6a392">Pode fechar esta aba.</p>
   <script>try{window.opener&&window.opener.postMessage('oauth-done','*')}catch(e){};setTimeout(()=>window.close(),2500)</script>
   </body>`;
 }

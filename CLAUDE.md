@@ -1,4 +1,4 @@
-# Projeto Dark
+# PagsDark 💸
 
 Plataforma **local** (roda no seu Mac) com **duas funções**, nada além disso:
 

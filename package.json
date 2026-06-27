@@ -1,9 +1,9 @@
 {
-  "name": "projeto-dark",
+  "name": "pagsdark",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Plataforma local: edicao de video em massa + agendamento automatico de posts (Kwai, TikTok, Instagram, YouTube Shorts).",
+  "description": "PagsDark - plataforma local: edicao de video em massa + agendamento automatico de posts (Kwai, TikTok, Instagram, YouTube Shorts).",
   "engines": {
     "node": ">=22.5.0"
   },

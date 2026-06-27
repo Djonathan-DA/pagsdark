@@ -39,6 +39,6 @@ app.use(express.static(path.join(ROOT, 'public')));
 app.get('*', (_req, res) => res.sendFile(path.join(ROOT, 'public', 'index.html')));
 
 app.listen(config.port, () => {
-  console.log(`\n  🌙  Projeto Dark rodando em ${config.baseUrl}\n`);
+  console.log(`\n  💸  PagsDark rodando em ${config.baseUrl}\n`);
   startWorker();
 });

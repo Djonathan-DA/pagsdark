@@ -3,163 +3,197 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Projeto Dark</title>
+  <title>💸 PagsDark</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💸</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header>
-    <div class="logo">🌙 Projeto <span>Dark</span></div>
-    <nav>
-      <button data-tab="editor" class="active">Editor em massa</button>
-      <button data-tab="contas">Contas</button>
-      <button data-tab="agendar">Agendar</button>
-    </nav>
-  </header>
-
-  <main>
-    <!-- ============ EDITOR ============ -->
-    <section id="tab-editor" class="tab active">
-      <h2>Editor de vídeo em massa</h2>
-      <p class="sub">Envie um molde (arte 9:16) e seus vídeos. Tudo é recortado no molde, em lote.</p>
-
-      <div class="card">
-        <h3>1 · Molde</h3>
-        <div class="row">
-          <div style="flex:1">
-            <label>Arte do molde (PNG 9:16, com a área do vídeo transparente)</label>
-            <input type="file" id="moldFile" accept="image/png" />
-          </div>
-          <button class="btn" id="moldUpload">Enviar molde</button>
-        </div>
-        <div class="grid cols" id="moldList" style="margin-top:14px"></div>
-      </div>
-
-      <div class="card">
-        <h3>2 · Vídeos</h3>
-        <div class="row">
-          <div style="flex:1">
-            <label>Enviar vídeos do computador (vários de uma vez)</label>
-            <input type="file" id="videoFiles" accept="video/*" multiple />
-          </div>
-          <button class="btn" id="videoUpload">Enviar vídeos</button>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <div style="flex:1">
-            <label>…ou importar uma pasta inteira do Mac (ideal p/ centenas de vídeos)</label>
-            <input type="text" id="folderPath" placeholder="/Users/voce/Videos/lote-junho" />
-          </div>
-          <button class="btn ghost" id="folderImport">Importar pasta</button>
-        </div>
-        <p class="note" id="sourceCount" style="margin-top:12px">Nenhum vídeo carregado.</p>
-        <div class="grid cols" id="sourceList" style="margin-top:12px"></div>
-      </div>
-
-      <div class="card">
-        <h3>3 · Renderizar</h3>
-        <div class="row between">
-          <span class="muted" id="renderHint">Selecione 1 molde acima. Sem seleção de vídeos, usa todos.</span>
-          <button class="btn" id="renderBtn">Renderizar em lote ▶</button>
-        </div>
-        <div id="renderProgress" class="hide" style="margin-top:14px">
-          <div class="row between"><span id="renderLabel">Renderizando…</span><span id="renderPct">0%</span></div>
-          <div class="bar"><div id="renderBar" style="width:0%"></div></div>
-          <div class="row" style="margin-top:10px">
-            <a class="btn sm" id="downloadZip" target="_blank">⬇ Baixar tudo (ZIP)</a>
-            <button class="btn sm ghost" id="goSchedule">Ir para o agendador →</button>
-          </div>
+  <div class="app">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="emoji">💸</span>
+        <div>
+          <div class="name">Pags<b>Dark</b></div>
+          <div class="tag">edite &amp; agende em massa</div>
         </div>
       </div>
+      <nav>
+        <button data-tab="editor" class="active" data-title="Editor em massa" data-sub="Aplique seu molde em centenas de vídeos de uma vez.">
+          <span class="ico">🎬</span> Editor em massa</button>
+        <button data-tab="contas" data-title="Contas &amp; Workspaces" data-sub="Vincule suas redes e organize por workspace.">
+          <span class="ico">🔗</span> Contas</button>
+        <button data-tab="agendar" data-title="Agendar postagens" data-sub="Programe o mês inteiro e deixe postar sozinho.">
+          <span class="ico">📅</span> Agendar</button>
+      </nav>
+      <div class="foot"><span class="dot"></span> Agendador ativo<br><span class="muted">postando enquanto o app estiver aberto</span></div>
+    </aside>
+
+    <!-- ===== CONTEÚDO ===== -->
+    <section class="content">
+      <div class="topbar">
+        <h1 id="pageTitle">Editor em massa</h1>
+        <p id="pageSub">Aplique seu molde em centenas de vídeos de uma vez.</p>
+      </div>
+      <main>
+
+        <!-- ============ EDITOR ============ -->
+        <section id="tab-editor" class="tab active">
+          <div class="hero">
+            <h2>Transforme um lote inteiro em segundos 🎬</h2>
+            <p>Envie um molde (arte 9:16) e seus vídeos. Cada vídeo é recortado e encaixado no molde, em massa. Baixe tudo em ZIP ou mande direto para o agendador.</p>
+            <span class="big">🎬</span>
+          </div>
+
+          <div class="card">
+            <h3><span class="step-n">1</span> Molde</h3>
+            <div class="row">
+              <div style="flex:1; min-width:240px">
+                <label>Arte do molde (PNG 9:16, com a área do vídeo transparente)</label>
+                <input type="file" id="moldFile" accept="image/png" />
+              </div>
+              <button class="btn" id="moldUpload">Enviar molde</button>
+            </div>
+            <div class="grid cols" id="moldList" style="margin-top:16px"></div>
+          </div>
+
+          <div class="card">
+            <h3><span class="step-n">2</span> Vídeos</h3>
+            <div class="row">
+              <div style="flex:1; min-width:240px">
+                <label>Enviar vídeos do computador (vários de uma vez)</label>
+                <input type="file" id="videoFiles" accept="video/*" multiple />
+              </div>
+              <button class="btn" id="videoUpload">Enviar vídeos</button>
+            </div>
+            <div class="row" style="margin-top:12px">
+              <div style="flex:1; min-width:240px">
+                <label>…ou importar uma pasta inteira do Mac (ideal p/ centenas de vídeos)</label>
+                <input type="text" id="folderPath" placeholder="/Users/voce/Videos/lote-junho" />
+              </div>
+              <button class="btn ghost" id="folderImport">Importar pasta</button>
+            </div>
+            <p class="note" id="sourceCount" style="margin-top:14px">Nenhum vídeo carregado.</p>
+            <div class="grid cols" id="sourceList" style="margin-top:14px"></div>
+          </div>
+
+          <div class="card">
+            <h3><span class="step-n">3</span> Renderizar</h3>
+            <div class="row between">
+              <span class="muted" id="renderHint">Selecione 1 molde acima. Sem seleção de vídeos, usa todos.</span>
+              <button class="btn" id="renderBtn">Renderizar em lote ▶</button>
+            </div>
+            <div id="renderProgress" class="hide" style="margin-top:16px">
+              <div class="row between"><span id="renderLabel">Renderizando…</span><span id="renderPct">0%</span></div>
+              <div class="bar"><div id="renderBar" style="width:0%"></div></div>
+              <div class="row" style="margin-top:12px">
+                <a class="btn sm" id="downloadZip" target="_blank">⬇ Baixar tudo (ZIP)</a>
+                <button class="btn sm ghost" id="goSchedule">Ir para o agendador →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ CONTAS ============ -->
+        <section id="tab-contas" class="tab">
+          <div class="hero">
+            <h2>Suas redes, organizadas 🔗</h2>
+            <p>Crie workspaces (como uma BM) e vincule Kwai, TikTok, Instagram e YouTube. Cada workspace agrupa as contas que você quer gerenciar junto.</p>
+            <span class="big">🔗</span>
+          </div>
+
+          <div class="card">
+            <h3>Workspaces</h3>
+            <div class="row">
+              <input type="text" id="wsName" placeholder="Nome do workspace (ex.: Cliente A)" style="flex:1; min-width:240px" />
+              <button class="btn" id="wsCreate">Criar workspace</button>
+            </div>
+            <div id="wsList" style="margin-top:18px"></div>
+          </div>
+
+          <div class="card">
+            <h3>Configurações das APIs</h3>
+            <p class="note" id="redirectNote"></p>
+            <div id="settingsForm" class="grid" style="grid-template-columns:1fr 1fr; margin-top:14px"></div>
+            <div class="row" style="margin-top:14px"><button class="btn" id="saveSettings">Salvar credenciais</button></div>
+          </div>
+        </section>
+
+        <!-- ============ AGENDAR ============ -->
+        <section id="tab-agendar" class="tab">
+          <div class="hero">
+            <h2>Programe o mês inteiro 📅</h2>
+            <p>Escolha os vídeos, as contas e os horários fixos (ex.: 10 posts/dia às 08h, 10h, 12h…). O PagsDark distribui tudo pelos dias e posta sozinho.</p>
+            <span class="big">📅</span>
+          </div>
+
+          <div class="card">
+            <h3>Nova campanha</h3>
+            <div class="grid" style="grid-template-columns:1fr 1fr">
+              <div>
+                <label>Workspace</label>
+                <select id="campWorkspace"></select>
+              </div>
+              <div>
+                <label>Nome da campanha</label>
+                <input type="text" id="campName" placeholder="Junho - Lote 1" />
+              </div>
+              <div>
+                <label>Data de início</label>
+                <input type="date" id="campStart" />
+              </div>
+              <div>
+                <label>Posts por dia</label>
+                <input type="number" id="campPerDay" value="10" min="1" max="48" />
+              </div>
+            </div>
+
+            <label>Horários fixos (um por post/dia). Deixe vazio p/ gerar automático.</label>
+            <div class="timeslots" id="slotInputs"></div>
+            <button class="btn ghost sm" id="genSlots" style="margin-top:10px">⚡ Gerar horários automáticos</button>
+
+            <label style="margin-top:16px">Contas que vão receber</label>
+            <div id="campAccounts" class="row"></div>
+
+            <div class="grid" style="grid-template-columns:1fr 1fr; margin-top:6px">
+              <div>
+                <label>Distribuição</label>
+                <select id="campFanout">
+                  <option value="cross">Mesmo vídeo em todas as contas (cross-post)</option>
+                  <option value="roundrobin">Alternar vídeos entre as contas (round-robin)</option>
+                </select>
+              </div>
+              <div>
+                <label>Legenda (use {n}, {date})</label>
+                <input type="text" id="campCaption" placeholder="Vídeo {n} 🔥 #fyp" />
+              </div>
+            </div>
+
+            <label style="margin-top:16px">Vídeos da biblioteca (renderizados). Sem seleção = todos.</label>
+            <div class="grid cols" id="libList"></div>
+
+            <div class="row between" style="margin-top:18px">
+              <span class="muted" id="campSummary"></span>
+              <button class="btn" id="createCampaign">Criar campanha 📅</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Campanhas</h3>
+            <div id="campList"></div>
+          </div>
+
+          <div class="card">
+            <h3>Próximos posts</h3>
+            <div id="postsTable"></div>
+          </div>
+        </section>
+
+      </main>
     </section>
-
-    <!-- ============ CONTAS ============ -->
-    <section id="tab-contas" class="tab">
-      <h2>Contas &amp; Workspaces</h2>
-      <p class="sub">Organize suas contas em workspaces (como uma BM) e vincule as redes.</p>
-
-      <div class="card">
-        <h3>Workspaces</h3>
-        <div class="row">
-          <input type="text" id="wsName" placeholder="Nome do workspace (ex.: Cliente A)" style="flex:1" />
-          <button class="btn" id="wsCreate">Criar workspace</button>
-        </div>
-        <div id="wsList" style="margin-top:16px"></div>
-      </div>
-
-      <div class="card">
-        <h3>Configurações das APIs</h3>
-        <p class="note" id="redirectNote"></p>
-        <div id="settingsForm" class="grid" style="grid-template-columns:1fr 1fr; margin-top:12px"></div>
-        <div class="row" style="margin-top:12px"><button class="btn" id="saveSettings">Salvar credenciais</button></div>
-      </div>
-    </section>
-
-    <!-- ============ AGENDAR ============ -->
-    <section id="tab-agendar" class="tab">
-      <h2>Agendar postagens</h2>
-      <p class="sub">Crie uma campanha: escolha vídeos, contas e os horários. A plataforma posta sozinha (com o app aberto).</p>
-
-      <div class="card">
-        <h3>Nova campanha</h3>
-        <div class="grid" style="grid-template-columns:1fr 1fr">
-          <div>
-            <label>Workspace</label>
-            <select id="campWorkspace"></select>
-          </div>
-          <div>
-            <label>Nome da campanha</label>
-            <input type="text" id="campName" placeholder="Junho - Lote 1" />
-          </div>
-          <div>
-            <label>Data de início</label>
-            <input type="date" id="campStart" />
-          </div>
-          <div>
-            <label>Posts por dia</label>
-            <input type="number" id="campPerDay" value="10" min="1" max="48" />
-          </div>
-        </div>
-
-        <label>Horários fixos (um por post/dia). Deixe vazio p/ gerar automático.</label>
-        <div class="timeslots" id="slotInputs"></div>
-        <button class="btn ghost sm" id="genSlots" style="margin-top:8px">Gerar horários automáticos</button>
-
-        <label style="margin-top:14px">Contas que vão receber</label>
-        <div id="campAccounts" class="row"></div>
-
-        <div class="grid" style="grid-template-columns:1fr 1fr; margin-top:6px">
-          <div>
-            <label>Distribuição</label>
-            <select id="campFanout">
-              <option value="cross">Mesmo vídeo em todas as contas (cross-post)</option>
-              <option value="roundrobin">Alternar vídeos entre as contas (round-robin)</option>
-            </select>
-          </div>
-          <div>
-            <label>Legenda (use {n}, {date})</label>
-            <input type="text" id="campCaption" placeholder="Vídeo {n} 🔥 #fyp" />
-          </div>
-        </div>
-
-        <label style="margin-top:14px">Vídeos da biblioteca (renderizados). Sem seleção = todos.</label>
-        <div class="grid cols" id="libList"></div>
-
-        <div class="row between" style="margin-top:16px">
-          <span class="muted" id="campSummary"></span>
-          <button class="btn" id="createCampaign">Criar campanha 📅</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Campanhas</h3>
-        <div id="campList"></div>
-      </div>
-
-      <div class="card">
-        <h3>Próximos posts</h3>
-        <div id="postsTable"></div>
-      </div>
-    </section>
-  </main>
+  </div>
 
   <script src="/app.js"></script>
 </body>

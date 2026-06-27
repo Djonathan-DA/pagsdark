@@ -1,4 +1,4 @@
-# Projeto Dark 🎬🌙
+# PagsDark 💸
 
 Plataforma **local** para criadores: edite vídeos em massa e agende postagens
 automáticas em **Kwai, TikTok, Instagram e YouTube Shorts**.
