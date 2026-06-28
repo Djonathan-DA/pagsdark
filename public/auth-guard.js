@@ -1,12 +1,11 @@
-// Guarda de sessão do app. Roda ANTES do app.js (ambos são módulos, então o
-// app.js só executa depois deste terminar — evita corrida com as chamadas à API).
-// Em modo local o servidor já protege tudo; aqui só montamos usuário + botão Sair.
+// Guarda de sessão do app. Roda ANTES do app.js (ambos módulos → app.js espera).
+// O servidor já protegeu tudo (se não estivesse logado, teria redirecionado).
+// Aqui: mostra usuário + Sair, e — se for sessão Google/Supabase — mantém o cookie fresco.
 const cfg = await (await fetch('/auth/config')).json();
 
-// Botão de Sair no topo (visível quando o login está exigido).
 if (cfg.required) document.getElementById('topLogout')?.classList.remove('hide');
 
-function mountUserBox(email, onLogout) {
+function mountUserBox(email) {
   const footEl = document.querySelector('.sidebar .foot');
   if (!footEl) return;
   const box = document.createElement('div');
@@ -16,31 +15,28 @@ function mountUserBox(email, onLogout) {
   out.className = 'btn ghost sm';
   out.textContent = 'Sair';
   out.style.marginTop = '8px';
-  out.onclick = onLogout;
+  out.onclick = () => { location.href = '/logout'; };
   box.appendChild(out);
   footEl.prepend(box);
 }
 
-if (cfg.required && cfg.supabase) {
-  // ---------- modo NUVEM (Supabase) ----------
-  const setCookie = (token, exp = 3600) => { document.cookie = `sb-access-token=${token}; path=/; max-age=${exp}; SameSite=Lax`; };
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  const sb = createClient(cfg.supabase.url, cfg.supabase.anonKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
-  });
-  const { data } = await sb.auth.getSession();
-  if (!data.session) { location.replace('/login'); await new Promise(() => {}); }
-  setCookie(data.session.access_token, data.session.expires_in || 3600);
-  sb.auth.onAuthStateChange((_e, session) => {
-    if (session) setCookie(session.access_token, session.expires_in || 3600);
-    else location.replace('/login');
-  });
-  mountUserBox(data.session.user?.email, async () => { try { await sb.auth.signOut(); } catch {} location.href = '/logout'; });
-  window.__supabase = sb;
-} else if (cfg.required) {
-  // ---------- modo LOCAL ----------
-  // Se chegamos aqui, o servidor já validou a sessão (senão teria redirecionado).
+if (cfg.required) {
   let me = {};
   try { me = await (await fetch('/auth/me')).json(); } catch {}
-  mountUserBox(me.email, () => { location.href = '/logout'; });
+  mountUserBox(me.email);
+
+  // Sessão Google/Supabase: renova o token e atualiza o cookie automaticamente.
+  if (cfg.supabase && typeof me.id === 'string' && me.id.startsWith('sb:')) {
+    try {
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+      const sb = createClient(cfg.supabase.url, cfg.supabase.anonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      });
+      const setCookie = (t, exp = 3600) => { document.cookie = `sb-access-token=${t}; path=/; max-age=${exp}; SameSite=Lax`; };
+      const { data } = await sb.auth.getSession();
+      if (data.session) setCookie(data.session.access_token, data.session.expires_in || 3600);
+      sb.auth.onAuthStateChange((_e, session) => { if (session) setCookie(session.access_token, session.expires_in || 3600); });
+      window.__supabase = sb;
+    } catch {}
+  }
 }

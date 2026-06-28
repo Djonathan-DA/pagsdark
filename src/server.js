@@ -59,10 +59,10 @@ app.post('/auth/local/login', express.json(), (req, res) => {
 // Gate: quando o login esta exigido, tudo (menos os itens publicos) precisa de sessao.
 const OPEN_PATHS = ['/login', '/login.html', '/login.js', '/style.css', '/auth/config',
   '/auth/local/login', '/auth/local/signup', '/logout', '/favicon.ico'];
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (!authRequired()) { req.user = { id: 'local', local: true }; return next(); }
   if (OPEN_PATHS.includes(req.path) || req.path.startsWith('/public-media')) return next();
-  const user = getUser(req);
+  const user = await getUser(req);
   if (user) { req.user = user; return next(); }
   if ((req.headers.accept || '').includes('text/html')) return res.redirect('/login');
   return res.status(401).json({ error: 'Não autenticado.' });

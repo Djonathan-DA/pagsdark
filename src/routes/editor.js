@@ -64,6 +64,15 @@ router.post('/molds/:id/area', express.json(), (req, res) => {
   res.json(get('SELECT * FROM molds WHERE id = ?', [mold.id]));
 });
 
+// Define COMO o vídeo entra no molde: por cima da arte (onTop=true -> has_alpha=0)
+// ou por trás, aparecendo pelo furo transparente (onTop=false -> has_alpha=1).
+router.post('/molds/:id/mode', express.json(), (req, res) => {
+  const mold = get('SELECT * FROM molds WHERE id = ?', [Number(req.params.id)]);
+  if (!mold) return res.status(404).json({ error: 'Molde nao encontrado.' });
+  run('UPDATE molds SET has_alpha = ? WHERE id = ?', [req.body.onTop ? 0 : 1, mold.id]);
+  res.json(get('SELECT * FROM molds WHERE id = ?', [mold.id]));
+});
+
 // Exclui um molde (e o arquivo PNG).
 router.delete('/molds/:id', (req, res) => {
   const mold = get('SELECT * FROM molds WHERE id = ?', [Number(req.params.id)]);

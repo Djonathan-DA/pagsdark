@@ -158,6 +158,8 @@ button.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-sh
 .card.action h4 { margin: 6px 0 0; font-size: 16px; font-weight: 700; }
 .card.action .cta { color: var(--orange2); font-weight: 700; font-size: 13px; margin-top: 8px; }
 .presets { flex-wrap: wrap; }
+.modes { flex-wrap: wrap; }
+.btn.ghost.sel-mode { border-color: var(--orange); background: rgba(255,122,24,.14); color: var(--txt); box-shadow: inset 0 0 0 1px var(--orange); }
 
 /* ===== Player modal (assistir vídeo pronto) ===== */
 .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; }

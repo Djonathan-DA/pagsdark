@@ -238,6 +238,7 @@ function refreshPreview() {
   }
   if (hint) hint.style.display = 'none';
   if (!state.area) syncAreaFromMold();
+  updateModeButtons();
   // avisa quando o molde nao tem area transparente confiavel (area_auto === 0)
   $('#areaWarn').classList.toggle('hide', mold.area_auto !== 0);
   const W = 240, s = W / mold.canvas_w, H = Math.round(mold.canvas_h * s);
@@ -336,6 +337,28 @@ $$('.presets [data-preset]').forEach((btn) => btn.onclick = () => {
   else if (p === 'top') { const w = ev(cw * 0.9), h = ev(ch * 0.45); a = { x: ev((cw - w) / 2), y: ev(ch * 0.05), w, h }; }
   else { const w = ev(cw * 0.9), h = ev(ch * 0.45); a = { x: ev((cw - w) / 2), y: ev(ch * 0.5), w, h }; } // bottom
   state.area = a; state.areaDirty = true; drawPreview();
+});
+
+// ---- Modo: vídeo POR CIMA da arte x POR TRÁS (furo transparente) ----
+function updateModeButtons() {
+  const mold = currentMold();
+  $$('.modes [data-mode]').forEach((b) => {
+    const isTop = b.dataset.mode === 'top';
+    const active = mold && ((isTop && Number(mold.has_alpha) === 0) || (!isTop && Number(mold.has_alpha) !== 0));
+    b.classList.toggle('sel-mode', !!active);
+  });
+}
+$$('.modes [data-mode]').forEach((btn) => btn.onclick = async () => {
+  const mold = currentMold(); if (!mold) return toast('Selecione um molde primeiro.', 'err');
+  const onTop = btn.dataset.mode === 'top';
+  try {
+    const u = await api('POST', `/api/editor/molds/${mold.id}/mode`, { onTop });
+    const idx = state.molds.findIndex((m) => m.id === mold.id);
+    if (idx >= 0) state.molds[idx] = u;
+    updateModeButtons();
+    drawPreview();
+    toast(onTop ? 'Vídeo vai colar POR CIMA da arte (vale também na renderização).' : 'Vídeo vai aparecer pelo FURO transparente.', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
 });
 
 // ---- Salvar a area no molde (persiste e passa a valer no render) ----

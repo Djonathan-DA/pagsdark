@@ -23,7 +23,7 @@ function sessionSecret() {
 // ---------- estado do auth ----------
 export function supabaseEnabled() {
   const s = config.supabase;
-  return Boolean(s && s.url && s.anonKey && s.jwtSecret);
+  return Boolean(s && s.url && s.anonKey);
 }
 export function localEnabled() { return Boolean(config.auth && config.auth.localEnabled); }
 // O login é EXIGIDO se o local está ligado ou o Supabase está configurado.
@@ -118,24 +118,45 @@ function parseCookies(req) {
   return out;
 }
 
-export function getUser(req) {
+// Valida um token do Supabase consultando /auth/v1/user (funciona com as chaves
+// novas, sem precisar do JWT secret). Cacheia o resultado por 60s para nao bater
+// no Supabase a cada requisicao (inclui as de midia/thumbs).
+const sbTokenCache = new Map();
+async function verifySupabaseToken(token) {
+  if (!token) return null;
+  const c = sbTokenCache.get(token);
+  if (c && c.exp > Date.now()) return c.user;
+  try {
+    const res = await fetch(`${config.supabase.url}/auth/v1/user`, {
+      headers: { apikey: config.supabase.anonKey, Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const u = await res.json();
+    if (!u || !u.id) return null;
+    const user = { id: 'sb:' + u.id, email: u.email || '' };
+    if (sbTokenCache.size > 500) sbTokenCache.clear();
+    sbTokenCache.set(token, { user, exp: Date.now() + 60000 });
+    return user;
+  } catch { return null; }
+}
+
+export async function getUser(req) {
   if (!authRequired()) return { id: 'local', email: 'local', local: true };
   const cookies = parseCookies(req);
-  // 1) sessão local
+  // 1) sessão local (rápida, sem rede)
   const local = verifySession(cookies['pd-session']);
   if (local) return local;
   // 2) token do Supabase (cookie ou Authorization)
   if (supabaseEnabled()) {
     const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    const payload = verifyJWT(cookies['sb-access-token'] || bearer, config.supabase.jwtSecret);
-    if (payload && payload.sub) return { id: 'sb:' + payload.sub, email: payload.email || '' };
+    return await verifySupabaseToken(cookies['sb-access-token'] || bearer);
   }
   return null;
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   if (!authRequired()) { req.user = { id: 'local', local: true }; return next(); }
-  const user = getUser(req);
+  const user = await getUser(req);
   if (!user) return res.status(401).json({ error: 'Não autenticado.' });
   req.user = user;
   next();
