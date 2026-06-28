@@ -50,10 +50,20 @@ function createWindow() {
 app.whenReady().then(() => {
   startServer();
   waitForServer(createWindow);
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+
+// Reabrir pelo Dock (macOS): garante o servidor de pé e recria a janela.
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length > 0) return;
+  if (!serverProc) { startServer(); waitForServer(createWindow); }
+  else createWindow();
 });
 
 function stopServer() { if (serverProc) { try { serverProc.kill(); } catch {} serverProc = null; } }
-app.on('window-all-closed', () => { stopServer(); if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => {
+  // No macOS o app continua no Dock; mantemos o servidor vivo para reabrir a
+  // janela sem backend morto. Em Windows/Linux, encerra tudo.
+  if (process.platform !== 'darwin') { stopServer(); app.quit(); }
+});
 app.on('quit', stopServer);
 app.on('before-quit', stopServer);
