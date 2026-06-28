@@ -28,6 +28,9 @@ const pick = (envKey, secretKey) => s[secretKey] || process.env[envKey] || '';
 
 export const config = {
   port: Number(process.env.PORT || 3000),
+  // Onde o servidor escuta. Padrao 127.0.0.1 (so o proprio Mac). Para acessar do
+  // celular na mesma rede Wi-Fi, use HOST=0.0.0.0 no .env (o login continua exigido).
+  host: process.env.HOST || '127.0.0.1',
   baseUrl: process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
   tz: process.env.TZ || 'America/Sao_Paulo',
   encryptionKey: process.env.ENCRYPTION_KEY || '',

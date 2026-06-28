@@ -1,0 +1,14 @@
+{
+  "name": "PagsDark",
+  "short_name": "PagsDark",
+  "description": "Edição de vídeo em massa + agendamento de posts",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0a09",
+  "theme_color": "#ff7a18",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

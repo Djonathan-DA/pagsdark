@@ -58,7 +58,8 @@ app.post('/auth/local/login', express.json(), (req, res) => {
 
 // Gate: quando o login esta exigido, tudo (menos os itens publicos) precisa de sessao.
 const OPEN_PATHS = ['/login', '/login.html', '/login.js', '/style.css', '/auth/config',
-  '/auth/local/login', '/auth/local/signup', '/logout', '/favicon.ico'];
+  '/auth/local/login', '/auth/local/signup', '/logout', '/favicon.ico',
+  '/manifest.webmanifest', '/icon.svg'];
 app.use(async (req, res, next) => {
   if (!authRequired()) { req.user = { id: 'local', local: true }; return next(); }
   if (OPEN_PATHS.includes(req.path) || req.path.startsWith('/public-media')) return next();
@@ -98,9 +99,10 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(ROOT, 'public', 'index.html'));
 });
 
-// Vincula apenas ao localhost: o app e local e nao deve ficar exposto na rede.
-app.listen(config.port, '127.0.0.1', () => {
-  console.log(`\n  💸  PagsDark rodando em ${config.baseUrl}\n`);
+// Escuta no host configurado (padrao localhost; 0.0.0.0 libera a rede Wi-Fi).
+app.listen(config.port, config.host, () => {
+  console.log(`\n  💸  PagsDark rodando em ${config.baseUrl}` +
+    (config.host === '0.0.0.0' ? `  (acessivel na rede Wi-Fi)` : '') + `\n`);
   startWorker();
   // Pre-gera os thumbnails que faltam, em background, para o editor abrir fluido.
   setTimeout(() => warmThumbnails().catch(() => {}), 1500);
