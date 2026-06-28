@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "description": "PagsDark - plataforma local: edicao de video em massa + agendamento automatico de posts (Kwai, TikTok, Instagram, YouTube Shorts).",
   "engines": {
     "node": ">=22.5.0"
@@ -10,9 +11,28 @@
   "scripts": {
     "start": "node --no-warnings src/server.js",
     "dev": "node --no-warnings --watch src/server.js",
+    "app": "electron electron/main.cjs",
+    "dist": "electron-builder",
     "daemon:install": "bash scripts/install-daemon.sh",
     "daemon:uninstall": "bash scripts/uninstall-daemon.sh",
     "daemon:status": "launchctl list | grep com.pagsdark.server || echo 'daemon nao esta rodando'"
+  },
+  "build": {
+    "appId": "com.pagsdark.app",
+    "productName": "PagsDark",
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -27,5 +47,9 @@
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
     "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
   }
 }

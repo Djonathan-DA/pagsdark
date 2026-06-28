@@ -30,20 +30,60 @@ const state = {
   molds: [],
   sourcesArr: [],
   focusX: 50, focusY: 50, sampleIdx: 0,
+  area: null,            // { x, y, w, h } em pixels do molde (onde o video entra)
+  areaDirty: false,      // true quando o usuario mexeu na area e ainda nao salvou
   activeWs: null,
   settings: null,
 };
 let PLATFORMS = [];
 
 // ===== Tabs =====
+function switchTab(name) {
+  const b = $$('nav button').find((x) => x.dataset.tab === name);
+  if (b) b.click();
+}
 $$('nav button').forEach((b) => b.onclick = () => {
   $$('nav button').forEach((x) => x.classList.toggle('active', x === b));
   $$('.tab').forEach((t) => t.classList.toggle('active', t.id === `tab-${b.dataset.tab}`));
   if (b.dataset.title) $('#pageTitle').textContent = b.dataset.title;
   if (b.dataset.sub) $('#pageSub').textContent = b.dataset.sub;
+  if (b.dataset.tab === 'inicio') loadInicio();
   if (b.dataset.tab === 'contas') loadContas();
   if (b.dataset.tab === 'agendar') refreshScheduleTab();
 });
+// Cartoes de atalho do dashboard
+$$('.card.action').forEach((c) => c.onclick = () => switchTab(c.dataset.go));
+
+// ===================== INÍCIO (DASHBOARD) =====================
+async function loadInicio() {
+  const [molds, sources, lib, camps, posts] = await Promise.all([
+    api('GET', '/api/editor/molds').catch(() => []),
+    api('GET', '/api/editor/sources').catch(() => []),
+    api('GET', '/api/editor/library').catch(() => []),
+    api('GET', '/api/schedule/campaigns').catch(() => []),
+    api('GET', '/api/schedule/posts').catch(() => []),
+  ]);
+  const scheduled = posts.filter((p) => p.status === 'scheduled').length;
+  const posted = posts.filter((p) => p.status === 'posted').length;
+  const stats = [
+    ['🖼️', 'Moldes', molds.length],
+    ['🎬', 'Vídeos carregados', sources.length],
+    ['✨', 'Renderizados', lib.length],
+    ['📅', 'Campanhas', camps.length],
+    ['⏳', 'Posts agendados', scheduled],
+    ['✅', 'Já postados', posted],
+  ];
+  $('#dashStats').innerHTML = stats.map(([ic, lbl, v]) =>
+    `<div class="card stat"><span class="si">${ic}</span><div><div class="sv">${v}</div><div class="sl">${lbl}</div></div></div>`).join('');
+  const next = posts.filter((p) => p.status === 'scheduled')
+    .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)).slice(0, 6);
+  const box = $('#dashNext');
+  if (!next.length) { box.innerHTML = '<p class="muted">Nenhum post agendado ainda. Crie uma campanha na aba Agendar.</p>'; return; }
+  box.innerHTML = `<table><thead><tr><th>Quando</th><th>Conta</th><th>Status</th></tr></thead><tbody>${
+    next.map((p) => `<tr><td>${p.scheduled_at.replace('T', ' ').slice(0, 16)}</td>
+      <td>${platIcon(p.platform)} ${p.account_name || p.platform}</td>
+      <td class="status-${p.status}">${p.status}</td></tr>`).join('')}</tbody></table>`;
+}
 
 // ===================== EDITOR =====================
 async function loadMolds() {
@@ -54,18 +94,44 @@ async function loadMolds() {
     const d = document.createElement('div');
     d.className = 'thumb' + (state.selMold === m.id ? ' sel' : '');
     d.innerHTML = `<img src="/mold-file/${m.id}" /><span class="tag">${m.canvas_w}×${m.canvas_h}</span>
-      <span class="pick">✓</span><span class="name">${m.name}</span>`;
-    d.onclick = () => { state.selMold = state.selMold === m.id ? null : m.id; loadMolds(); refreshPreview(); };
+      <span class="pick">✓</span><button class="del" title="Excluir molde">✕</button><span class="name">${m.name}</span>`;
+    d.onclick = () => selectMold(m.id);
+    d.querySelector('.del').onclick = (e) => { e.stopPropagation(); delMold(m.id); };
     box.appendChild(d);
   });
   refreshPreview();
+}
+function selectMold(id) {
+  if (state.selMold === id) return; // ja selecionado: mantem (nao perde o preview nem a area em edicao)
+  if (state.areaDirty && !confirm('Você ajustou a área e não salvou. Trocar de molde vai descartar esse ajuste. Continuar?')) return;
+  state.selMold = id;
+  syncAreaFromMold();
+  loadMolds();
+}
+// Copia a area salva do molde selecionado para o estado local (ponto de partida da edicao).
+function syncAreaFromMold() {
+  const m = currentMold();
+  state.area = m ? { x: m.area_x, y: m.area_y, w: m.area_w, h: m.area_h } : null;
+  state.areaDirty = false;
+}
+async function delMold(id) {
+  if (!confirm('Excluir este molde?')) return;
+  await api('DELETE', '/api/editor/molds/' + id);
+  if (state.selMold === id) { state.selMold = null; state.area = null; }
+  loadMolds();
 }
 $('#moldUpload').onclick = async () => {
   const f = $('#moldFile').files[0];
   if (!f) return toast('Escolha um PNG.', 'err');
   const fd = new FormData(); fd.append('mold', f);
-  try { const m = await api('POST', '/api/editor/molds', fd, true); state.selMold = m.id; await loadMolds(); toast('Molde adicionado: área detectada ' + m.area_w + '×' + m.area_h, 'ok'); }
-  catch (e) { toast(e.message, 'err'); }
+  try {
+    const m = await api('POST', '/api/editor/molds', fd, true);
+    state.selMold = m.id;
+    await loadMolds();
+    syncAreaFromMold();
+    if (m.area_auto) toast(`Molde adicionado: área transparente detectada ${m.area_w}×${m.area_h}.`, 'ok');
+    else toast('Molde adicionado (PNG opaco). No passo 3, marque onde o vídeo entra — ele será colado nessa área.', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
 };
 
 async function loadSources() {
@@ -74,9 +140,10 @@ async function loadSources() {
   $('#sourceCount').textContent = src.length
     ? `${src.length} vídeo(s) carregado(s). Selecione alguns ou deixe sem seleção para usar todos.`
     : 'Nenhum vídeo carregado.';
+  $('#clearSources').style.display = src.length ? '' : 'none';
   const box = $('#sourceList');
   box.innerHTML = '';
-  src.slice(0, MAX_THUMBS).forEach((m) => box.appendChild(mediaThumb(m, state.selSources, () => { loadSources(); })));
+  src.slice(0, MAX_THUMBS).forEach((m) => box.appendChild(mediaThumb(m, state.selSources, () => { loadSources(); }, delSource)));
   if (src.length > MAX_THUMBS) {
     const more = document.createElement('p'); more.className = 'muted';
     more.textContent = `+${src.length - MAX_THUMBS} vídeos não exibidos (incluídos se nada estiver selecionado).`;
@@ -84,20 +151,59 @@ async function loadSources() {
   }
   refreshPreview();
 }
-function mediaThumb(m, selSet, reload) {
+async function delSource(m) {
+  await api('DELETE', '/api/editor/sources/' + m.id);
+  state.selSources.delete(m.id);
+  loadSources();
+}
+// Thumbnail leve: usa o poster JPG gerado no servidor (nada de dezenas de <video>).
+function mediaThumb(m, selSet, reload, onDelete) {
   const d = document.createElement('div');
   d.className = 'thumb' + (selSet.has(m.id) ? ' sel' : '');
-  d.innerHTML = `<video src="/preview/${m.id}#t=0.5" muted preload="metadata"></video>
-    <span class="pick">✓</span><span class="name">${m.label || ('#' + m.id)}</span>`;
+  d.innerHTML = `<img loading="lazy" src="/api/editor/thumb/${m.id}" alt="" />
+    <span class="pick">✓</span>
+    ${onDelete ? '<button class="del" title="Excluir">✕</button>' : ''}
+    <span class="name">${m.label || ('#' + m.id)}</span>`;
+  const img = d.querySelector('img');
+  if (img) img.onerror = () => { img.style.visibility = 'hidden'; };
   d.onclick = () => { selSet.has(m.id) ? selSet.delete(m.id) : selSet.add(m.id); reload(); };
+  if (onDelete) d.querySelector('.del').onclick = (e) => { e.stopPropagation(); onDelete(m); };
   return d;
 }
+// Upload em LOTES pequenos: evita segurar centenas de arquivos na memoria do
+// navegador de uma vez (era o que travava o PC) e mostra progresso.
 $('#videoUpload').onclick = async () => {
-  const files = $('#videoFiles').files;
+  const files = [...$('#videoFiles').files];
   if (!files.length) return toast('Escolha vídeos.', 'err');
-  const fd = new FormData(); [...files].forEach((f) => fd.append('videos', f));
-  try { const r = await api('POST', '/api/editor/sources/upload', fd, true); toast(`${r.length} vídeo(s) enviados`, 'ok'); await loadSources(); }
-  catch (e) { toast(e.message, 'err'); }
+  const CHUNK = 4;
+  const prog = $('#uploadProgress');
+  prog.classList.remove('hide');
+  $('#videoUpload').disabled = true;
+  let done = 0, ok = 0;
+  for (let i = 0; i < files.length; i += CHUNK) {
+    const batch = files.slice(i, i + CHUNK);
+    const fd = new FormData(); batch.forEach((f) => fd.append('videos', f));
+    try { const r = await api('POST', '/api/editor/sources/upload', fd, true); ok += r.length; }
+    catch (e) { toast(e.message, 'err'); }
+    done += batch.length;
+    const pct = Math.round((done / files.length) * 100);
+    $('#uploadBar').style.width = pct + '%';
+    $('#uploadPct').textContent = pct + '%';
+    $('#uploadLabel').textContent = `Enviando… ${done}/${files.length}`;
+    await loadSources();
+  }
+  $('#uploadLabel').textContent = `Concluído: ${ok} vídeo(s).`;
+  $('#videoUpload').disabled = false;
+  $('#videoFiles').value = '';
+  toast(`${ok} vídeo(s) enviados`, 'ok');
+  setTimeout(() => prog.classList.add('hide'), 2500);
+};
+$('#clearSources').onclick = async () => {
+  if (!confirm('Excluir TODOS os vídeos carregados? Esta ação não pode ser desfeita.')) return;
+  await api('DELETE', '/api/editor/sources');
+  state.selSources.clear();
+  toast('Todos os vídeos foram removidos.', 'ok');
+  loadSources();
 };
 $('#folderImport').onclick = async () => {
   const folder = $('#folderPath').value.trim();
@@ -117,35 +223,42 @@ function currentSample() {
 function refreshPreview() {
   const canvas = $('#previewCanvas'); if (!canvas) return;
   const hint = $('#previewHint');
-  const mold = currentMold(), sample = currentSample();
-  if (!mold || !sample) {
+  const mold = currentMold();
+  if (!mold) {
     if (hint) hint.style.display = '';
+    $('#areaWarn').classList.add('hide');
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     return;
   }
   if (hint) hint.style.display = 'none';
-  const W = 240, s = W / mold.canvas_w;
-  canvas.width = W; canvas.height = Math.round(mold.canvas_h * s);
+  if (!state.area) syncAreaFromMold();
+  // avisa quando o molde nao tem area transparente confiavel (area_auto === 0)
+  $('#areaWarn').classList.toggle('hide', mold.area_auto !== 0);
+  const W = 240, s = W / mold.canvas_w, H = Math.round(mold.canvas_h * s);
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
   if (pv.moldId !== mold.id) {
     pv.moldId = mold.id; pv.imgReady = false; pv.img = new Image();
     pv.img.onload = () => { pv.imgReady = true; drawPreview(); };
     pv.img.src = '/mold-file/' + mold.id;
   }
-  if (pv.sampleId !== sample.id) {
+  const sample = currentSample();
+  if (sample && pv.sampleId !== sample.id) {
     pv.sampleId = sample.id; pv.vidReady = false;
     if (!pv.video) { pv.video = document.createElement('video'); pv.video.muted = true; pv.video.playsInline = true; }
     pv.video.onloadeddata = () => { try { pv.video.currentTime = Math.min(1, (pv.video.duration || 2) / 2); } catch (e) {} };
     pv.video.onseeked = () => { pv.vidReady = true; drawPreview(); };
     pv.video.src = '/preview/' + sample.id; pv.video.load();
+  } else if (!sample) {
+    pv.sampleId = null; pv.vidReady = false;
   }
   drawPreview();
 }
 function drawPreview() {
   const canvas = $('#previewCanvas'); if (!canvas) return;
-  const mold = currentMold(); if (!mold) return;
+  const mold = currentMold(); if (!mold || !state.area) return;
   const ctx = canvas.getContext('2d');
   const s = canvas.width / mold.canvas_w;
-  const ax = mold.area_x * s, ay = mold.area_y * s, aw = mold.area_w * s, ah = mold.area_h * s;
+  const ax = state.area.x * s, ay = state.area.y * s, aw = state.area.w * s, ah = state.area.h * s;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#000'; ctx.fillRect(ax, ay, aw, ah);
   if (pv.vidReady && pv.video.videoWidth) {
@@ -157,7 +270,73 @@ function drawPreview() {
     ctx.restore();
   }
   if (pv.imgReady) ctx.drawImage(pv.img, 0, 0, canvas.width, canvas.height);
+  // contorno da area por cima de tudo, para o usuario ver onde o video entra
+  ctx.save();
+  ctx.strokeStyle = '#ff7a18'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+  ctx.strokeRect(ax + 1, ay + 1, Math.max(0, aw - 2), Math.max(0, ah - 2));
+  ctx.restore();
 }
+
+// ---- Definir a area arrastando no preview ----
+(function setupAreaDrag() {
+  const canvas = $('#previewCanvas'); if (!canvas) return;
+  let dragging = false, sx = 0, sy = 0;
+  const toMold = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const mold = currentMold();
+    const scale = mold ? mold.canvas_w / canvas.width : 1;
+    const cx = (e.clientX - r.left) * (canvas.width / r.width);
+    const cy = (e.clientY - r.top) * (canvas.height / r.height);
+    return { x: cx * scale, y: cy * scale };
+  };
+  canvas.addEventListener('mousedown', (e) => {
+    if (!currentMold()) return;
+    dragging = true; const p = toMold(e); sx = p.x; sy = p.y; e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const mold = currentMold(); if (!mold) return;
+    const p = toMold(e);
+    const x = Math.max(0, Math.min(sx, p.x)), y = Math.max(0, Math.min(sy, p.y));
+    const x2 = Math.min(mold.canvas_w, Math.max(sx, p.x)), y2 = Math.min(mold.canvas_h, Math.max(sy, p.y));
+    state.area = { x: Math.round(x), y: Math.round(y), w: Math.round(x2 - x), h: Math.round(y2 - y) };
+    state.areaDirty = true; drawPreview();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return; dragging = false;
+    if (state.area && (state.area.w < 8 || state.area.h < 8)) { syncAreaFromMold(); drawPreview(); } // ignora clique sem arrasto
+  });
+})();
+
+// ---- Locais predefinidos (presets) ----
+$$('.presets [data-preset]').forEach((btn) => btn.onclick = () => {
+  const mold = currentMold(); if (!mold) return toast('Selecione um molde primeiro.', 'err');
+  const cw = mold.canvas_w, ch = mold.canvas_h;
+  const ev = (n) => Math.max(2, Math.round(n / 2) * 2);
+  const p = btn.dataset.preset; let a;
+  if (p === 'center') { const w = ev(cw * 0.8), h = ev(ch * 0.8); a = { x: ev((cw - w) / 2), y: ev((ch - h) / 2), w, h }; }
+  else if (p === 'full') a = { x: 0, y: 0, w: ev(cw), h: ev(ch) };
+  else if (p === 'top') { const w = ev(cw * 0.9), h = ev(ch * 0.45); a = { x: ev((cw - w) / 2), y: ev(ch * 0.05), w, h }; }
+  else { const w = ev(cw * 0.9), h = ev(ch * 0.45); a = { x: ev((cw - w) / 2), y: ev(ch * 0.5), w, h }; } // bottom
+  state.area = a; state.areaDirty = true; drawPreview();
+});
+
+// ---- Salvar a area no molde (persiste e passa a valer no render) ----
+$('#saveArea').onclick = async () => {
+  const mold = currentMold(); if (!mold || !state.area) return toast('Selecione um molde e marque a área.', 'err');
+  try {
+    const updated = await api('POST', `/api/editor/molds/${mold.id}/area`, state.area);
+    const idx = state.molds.findIndex((m) => m.id === mold.id);
+    if (idx >= 0) state.molds[idx] = updated;
+    state.area = { x: updated.area_x, y: updated.area_y, w: updated.area_w, h: updated.area_h };
+    state.areaDirty = false;
+    $('#areaWarn').classList.add('hide');
+    const chip = $('#areaSaved'); chip.classList.remove('hide'); setTimeout(() => chip.classList.add('hide'), 2000);
+    toast('Área salva no molde. Já vale para a renderização.', 'ok');
+    drawPreview();
+  } catch (e) { toast(e.message, 'err'); }
+};
+
 $('#focusX').oninput = (e) => { state.focusX = +e.target.value; drawPreview(); };
 $('#focusY').oninput = (e) => { state.focusY = +e.target.value; drawPreview(); };
 $('#sampleNext').onclick = () => { state.sampleIdx++; refreshPreview(); };
@@ -165,6 +344,15 @@ $('#centerFocus').onclick = () => { state.focusX = 50; state.focusY = 50; $('#fo
 
 $('#renderBtn').onclick = async () => {
   if (!state.selMold) return toast('Selecione um molde.', 'err');
+  // se a area foi ajustada e nao salva, salva antes de renderizar
+  if (state.areaDirty && state.area) {
+    try {
+      const u = await api('POST', `/api/editor/molds/${state.selMold}/area`, state.area);
+      const idx = state.molds.findIndex((m) => m.id === state.selMold);
+      if (idx >= 0) state.molds[idx] = u;
+      state.areaDirty = false;
+    } catch (e) { return toast('Não consegui salvar a área: ' + e.message, 'err'); }
+  }
   try {
     const { jobId } = await api('POST', '/api/editor/render', {
       moldId: state.selMold, sourceIds: [...state.selSources],
@@ -375,9 +563,10 @@ $('#genSlots').onclick = () => {
 };
 async function loadLibrary() {
   const lib = await api('GET', '/api/editor/library');
+  $('#clearLibrary').style.display = lib.length ? '' : 'none';
   const box = $('#libList'); box.innerHTML = '';
   if (!lib.length) { box.innerHTML = '<p class="muted">Nenhum vídeo renderizado ainda. Use o Editor primeiro.</p>'; updateSummary(); return; }
-  lib.slice(0, MAX_THUMBS).forEach((m) => box.appendChild(mediaThumb(m, state.selLib, () => { loadLibrary(); })));
+  lib.slice(0, MAX_THUMBS).forEach((m) => box.appendChild(mediaThumb(m, state.selLib, () => { loadLibrary(); }, delLibrary)));
   if (lib.length > MAX_THUMBS) {
     const p = document.createElement('p'); p.className = 'muted';
     p.textContent = `+${lib.length - MAX_THUMBS} não exibidos (incluídos se nada for selecionado).`;
@@ -451,6 +640,21 @@ async function loadPosts() {
     ${posts.length > 100 ? `<p class="muted">+${posts.length - 100} posts…</p>` : ''}`;
 }
 window.cancelPost = async (id) => { await api('POST', `/api/schedule/posts/${id}/cancel`); loadPosts(); };
+async function delLibrary(m) {
+  if (!confirm('Excluir este vídeo renderizado da biblioteca?')) return;
+  await api('DELETE', '/api/editor/library/' + m.id);
+  state.selLib.delete(m.id);
+  loadLibrary();
+}
+$('#clearLibrary').onclick = async () => {
+  if (!confirm('Excluir TODOS os vídeos renderizados da biblioteca?')) return;
+  await api('DELETE', '/api/editor/library');
+  state.selLib.clear();
+  toast('Biblioteca limpa.', 'ok');
+  loadLibrary();
+};
 
 // ===== Init =====
-loadMolds(); loadSources();
+loadInicio();
+loadMolds();
+loadSources();

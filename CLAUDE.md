@@ -36,6 +36,7 @@ src/
   db.js                Banco SQLite (tabelas) + funções de acesso
   ffmpeg.js            Aponta o fluent-ffmpeg para os binários estáticos
   crypto.js            Cifra/decifra os tokens das contas
+  auth.js              Login dos usuários (valida o JWT do Supabase) — opcional
 
   editor/              FUNÇÃO 1 — edição em massa
     mold.js              Detecta a área transparente do molde PNG (onde o vídeo entra)
@@ -70,11 +71,35 @@ data/                  (não vai pro git) banco + vídeos + saídas + daemon.log
 servidor + agendador sempre rodando e inicia ao logar — assim os posts disparam mesmo
 com o navegador fechado. `npm run daemon:uninstall` remove. Logs em `data/daemon.log`.
 
-## Editor: posicionamento (pan)
+## Editor: área do vídeo + posicionamento (pan)
 
-No passo 3 do Editor há um preview em canvas (molde + frame do vídeo) com sliders
-horizontal/vertical. O foco escolhido (`focusX`/`focusY`, 0–100) vai pro render e é
-aplicado no `crop` do ffmpeg para todos os vídeos do lote.
+No passo 3 do Editor há um preview em canvas. O usuário define a **área** onde o
+vídeo entra de 3 formas: **presets** (Centro/Inteiro/Topo/Base), **arrastando** um
+retângulo no preview, ou pela **detecção automática** do furo transparente do PNG.
+A área é salva no molde (`area_x/y/w/h`, `POST /api/editor/molds/:id/area`).
+O **render** decide a composição pelo `has_alpha` do molde: com furo transparente,
+a arte vai por cima (vídeo aparece pelo buraco); molde opaco, o vídeo é colado por
+cima da arte na área marcada. O **enquadramento** (`focusX`/`focusY`, 0–100) é o
+`crop` do ffmpeg e vale para todo o lote.
+
+Thumbnails são **posters JPG gerados sob demanda** (`GET /api/editor/thumb/:id`,
+ffmpeg) — não usamos `<video>` na grade (travava o PC). Upload é feito em lotes.
+Excluir: `DELETE /sources/:id|/sources|/library/:id|/library|/molds/:id`. Vídeos
+importados por referência (pasta do Mac) só somem da lista — o original não é apagado.
+
+## Login e segurança (opcional, Supabase)
+
+`src/auth.js` valida o JWT do Supabase no servidor; `public/login.html` faz o login
+(Google / e-mail+senha); `public/auth-guard.js` protege o app e mantém o cookie.
+Só liga se `SUPABASE_URL/ANON_KEY/JWT_SECRET` estiverem no `.env` (senão, modo local).
+Gate em `src/server.js`. Passo a passo: `SETUP-LOGIN.md`. O servidor escuta só em
+`127.0.0.1` e manda cabeçalhos de segurança.
+
+## Virar aplicativo (desktop, Electron)
+
+`electron/main.cjs` sobe o `src/server.js` e abre uma janela. `npm run app` roda;
+`npm run dist` (electron-builder) gera o instalador. É o **mesmo site por dentro** —
+editar os arquivos e reabrir continua funcionando normalmente.
 
 ## Banco de dados (tabelas)
 

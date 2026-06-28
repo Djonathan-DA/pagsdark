@@ -8,6 +8,23 @@ ffmpeg.setFfprobePath(ffprobeStatic.path);
 
 export { ffmpeg };
 
+// Gera um poster leve (1 frame, JPG ~320px de largura) para usar como thumbnail
+// no navegador, em vez de carregar dezenas de <video> ao mesmo tempo (trava o PC).
+export function makeThumbnail(videoFile, outPath, seconds = 0.5) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(videoFile)
+      .inputOptions(['-ss', String(seconds)]) // seek rapido antes de decodificar
+      .outputOptions([
+        '-frames:v', '1',
+        '-vf', 'scale=320:-2:force_original_aspect_ratio=decrease',
+        '-q:v', '4',
+      ])
+      .on('end', () => resolve(outPath))
+      .on('error', (err) => reject(err))
+      .save(outPath);
+  });
+}
+
 // Le metadados (duracao, largura, altura) de um arquivo de video.
 export function probe(file) {
   return new Promise((resolve, reject) => {

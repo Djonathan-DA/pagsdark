@@ -34,10 +34,17 @@ export async function analyzeMold(filePath) {
   }
 
   let area;
+  let detected;
   if (maxX < 0) {
-    // Sem transparencia: usa o canvas inteiro.
-    area = { x: 0, y: 0, w: even(canvasW), h: even(canvasH) };
+    // Sem transparencia: assume um retangulo central 9:16 como ponto de partida
+    // (o usuario ajusta na tela). Antes usava o canvas inteiro, o que fazia a arte
+    // opaca cobrir o video por completo no resultado.
+    detected = false;
+    const w = even(Math.round(canvasW * 0.8));
+    const h = even(Math.round(canvasH * 0.8));
+    area = { x: even(Math.round((canvasW - w) / 2)), y: even(Math.round((canvasH - h) / 2)), w, h };
   } else {
+    detected = true;
     area = {
       x: even(minX),
       y: even(minY),
@@ -46,5 +53,5 @@ export async function analyzeMold(filePath) {
     };
   }
 
-  return { canvasW: even(canvasW), canvasH: even(canvasH), area };
+  return { canvasW: even(canvasW), canvasH: even(canvasH), area, detected };
 }

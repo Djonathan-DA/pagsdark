@@ -109,6 +109,16 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX IF NOT EXISTS idx_posts_due ON posts(status, scheduled_at);
 `);
 
+// ----- Migracoes leves (colunas adicionadas depois) -----
+// SQLite nao tem "ADD COLUMN IF NOT EXISTS"; tentamos e ignoramos se ja existe.
+function addColumn(table, colDef) {
+  try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${colDef}`); }
+  catch (e) { if (!/duplicate column/i.test(String(e.message || e))) throw e; }
+}
+addColumn('media_assets', 'thumb_path TEXT');      // poster JPG leve (gerado sob demanda)
+addColumn('molds', 'area_auto INTEGER DEFAULT 1'); // 1 = area confiavel (transparencia detectada OU definida na tela); 0 = placeholder, precisa atencao
+addColumn('molds', 'has_alpha INTEGER DEFAULT 1'); // 1 = PNG tem furo transparente (video aparece por baixo da arte); 0 = PNG opaco (video e colado por cima, na area marcada)
+
 export default db;
 
 // ----- Helpers genericos -----

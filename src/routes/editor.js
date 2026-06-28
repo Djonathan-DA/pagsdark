@@ -5,10 +5,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import archiver from 'archiver';
 import { DIRS } from '../config.js';
-import { all, get, insert } from '../db.js';
+import { all, get, run, insert } from '../db.js';
 import { analyzeMold } from '../editor/mold.js';
-import { probe } from '../ffmpeg.js';
+import { probe, makeThumbnail } from '../ffmpeg.js';
 import { startBatch, jobStatus } from '../editor/batch.js';
+
+// Remove um arquivo do disco sem quebrar se ele nao existir.
+function safeUnlink(p) { try { if (p && fs.existsSync(p)) fs.unlinkSync(p); } catch {} }
 
 const router = express.Router();
 
@@ -28,17 +31,43 @@ router.post('/molds', uploadMold.single('mold'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Envie um arquivo PNG no campo "mold".' });
     const finalPath = path.join(DIRS.molds, `mold-${Date.now()}.png`);
     fs.renameSync(req.file.path, finalPath);
-    const { canvasW, canvasH, area } = await analyzeMold(finalPath);
+    const { canvasW, canvasH, area, detected } = await analyzeMold(finalPath);
     const name = req.body.name || path.parse(req.file.originalname).name;
     const id = insert(
-      `INSERT INTO molds (name, file_path, canvas_w, canvas_h, area_x, area_y, area_w, area_h)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [name, finalPath, canvasW, canvasH, area.x, area.y, area.w, area.h]
+      `INSERT INTO molds (name, file_path, canvas_w, canvas_h, area_x, area_y, area_w, area_h, area_auto, has_alpha)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [name, finalPath, canvasW, canvasH, area.x, area.y, area.w, area.h, detected ? 1 : 0, detected ? 1 : 0]
     );
     res.json(get('SELECT * FROM molds WHERE id = ?', [id]));
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
+});
+
+// Atualiza a AREA do video no molde (seletor manual / presets na tela).
+router.post('/molds/:id/area', express.json(), (req, res) => {
+  const mold = get('SELECT * FROM molds WHERE id = ?', [Number(req.params.id)]);
+  if (!mold) return res.status(404).json({ error: 'Molde nao encontrado.' });
+  const clampEven = (v, max) => {
+    let n = Math.round(Number(v) || 0);
+    n = Math.max(0, Math.min(n, max));
+    return Math.max(2, n - (n % 2)); // par (exigencia do H.264)
+  };
+  const x = Math.max(0, Math.min(Math.round(Number(req.body.x) || 0), mold.canvas_w - 2));
+  const y = Math.max(0, Math.min(Math.round(Number(req.body.y) || 0), mold.canvas_h - 2));
+  const w = clampEven(req.body.w, mold.canvas_w - x);
+  const h = clampEven(req.body.h, mold.canvas_h - y);
+  // area definida manualmente passa a ser "confiavel" (area_auto = 1): some o aviso.
+  run('UPDATE molds SET area_x=?, area_y=?, area_w=?, area_h=?, area_auto=1 WHERE id=?',
+    [x - (x % 2), y - (y % 2), w, h, mold.id]);
+  res.json(get('SELECT * FROM molds WHERE id = ?', [mold.id]));
+});
+
+// Exclui um molde (e o arquivo PNG).
+router.delete('/molds/:id', (req, res) => {
+  const mold = get('SELECT * FROM molds WHERE id = ?', [Number(req.params.id)]);
+  if (mold) { safeUnlink(mold.file_path); run('DELETE FROM molds WHERE id = ?', [mold.id]); }
+  res.json({ ok: true });
 });
 
 // ---- Videos-fonte ----
@@ -83,6 +112,54 @@ async function registerSource(filePath, label) {
   return get('SELECT * FROM media_assets WHERE id = ?', [id]);
 }
 
+// Poster leve (JPG) de qualquer asset — gerado sob demanda e cacheado em disco.
+// Substitui dezenas de <video> no navegador (era o que travava o PC ao subir muitos videos).
+router.get('/thumb/:id', async (req, res) => {
+  const m = get('SELECT * FROM media_assets WHERE id = ?', [Number(req.params.id)]);
+  if (!m || !fs.existsSync(m.file_path)) return res.status(404).end();
+  const cached = m.thumb_path && fs.existsSync(m.thumb_path) ? m.thumb_path : null;
+  if (cached) { res.type('jpg'); return res.sendFile(path.resolve(cached)); }
+  const out = path.join(DIRS.thumbs, `thumb-${m.id}.jpg`);
+  try {
+    await makeThumbnail(m.file_path, out);
+    run('UPDATE media_assets SET thumb_path = ? WHERE id = ?', [out, m.id]);
+    res.type('jpg');
+    res.sendFile(path.resolve(out));
+  } catch {
+    res.status(404).end();
+  }
+});
+
+// Um arquivo e "gerenciado" se vive dentro de data/ (foi copiado/gerado pelo app).
+// Videos importados por REFERENCIA (via "Importar pasta") apontam para a pasta
+// original do usuario e NUNCA devem ser apagados do disco ao excluir da lista.
+function isManaged(p) {
+  if (!p) return false;
+  const rel = path.relative(DIRS.data, path.resolve(p));
+  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+// Remove um asset do banco; apaga do disco apenas arquivos gerenciados (data/).
+function removeAsset(m) {
+  if (!m) return;
+  if (isManaged(m.file_path)) safeUnlink(m.file_path);
+  safeUnlink(m.thumb_path); // thumb fica sempre em data/thumbs -> seguro apagar
+  run('DELETE FROM media_assets WHERE id = ?', [m.id]);
+}
+
+// Excluir UM video-fonte.
+router.delete('/sources/:id', (req, res) => {
+  removeAsset(get("SELECT * FROM media_assets WHERE id = ? AND kind = 'source'", [Number(req.params.id)]));
+  res.json({ ok: true });
+});
+
+// Excluir TODOS os videos-fonte de uma vez.
+router.delete('/sources', (_req, res) => {
+  const list = all("SELECT * FROM media_assets WHERE kind = 'source'");
+  list.forEach(removeAsset);
+  res.json({ ok: true, removed: list.length });
+});
+
 // ---- Renderizacao em lote ----
 router.post('/render', express.json(), (req, res) => {
   try {
@@ -124,6 +201,19 @@ router.get('/job/:id/zip', (req, res) => {
 // biblioteca de videos JA renderizados (usada pelo agendador)
 router.get('/library', (_req, res) => {
   res.json(all("SELECT * FROM media_assets WHERE kind = 'rendered' ORDER BY id DESC"));
+});
+
+// Excluir UM video renderizado da biblioteca.
+router.delete('/library/:id', (req, res) => {
+  removeAsset(get("SELECT * FROM media_assets WHERE id = ? AND kind = 'rendered'", [Number(req.params.id)]));
+  res.json({ ok: true });
+});
+
+// Excluir TODOS os videos renderizados.
+router.delete('/library', (_req, res) => {
+  const list = all("SELECT * FROM media_assets WHERE kind = 'rendered'");
+  list.forEach(removeAsset);
+  res.json({ ok: true, removed: list.length });
 });
 
 export default router;

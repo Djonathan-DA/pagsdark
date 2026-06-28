@@ -15,24 +15,33 @@ export async function renderOne(sourceVideo, mold, outputPath, focus = {}) {
   const fx = Math.min(1, Math.max(0, fnum(focus.x) / 100));
   const fy = Math.min(1, Math.max(0, fnum(focus.y) / 100));
 
+  // Dois modos de composicao:
+  //  - has_alpha = 1: o molde TEM furo transparente -> a arte vai POR CIMA e o
+  //    video aparece pelo buraco (comportamento classico de "moldura").
+  //  - has_alpha = 0: o molde e opaco -> colamos o video POR CIMA da arte, dentro
+  //    da area marcada. Assim a area que o usuario escolhe sempre tem efeito.
+  const hasAlpha = mold.has_alpha === undefined ? 1 : Number(mold.has_alpha);
+  const videoStage = `[0:v]scale=${aw}:${ah}:force_original_aspect_ratio=increase,crop=${aw}:${ah}:(iw-${aw})*${fx.toFixed(4)}:(ih-${ah})*${fy.toFixed(4)},setsar=1,fps=30[vid]`;
+  const filters = hasAlpha
+    ? [
+        `color=c=black:s=${cw}x${ch}:r=30:d=${dur}[bg]`,
+        videoStage,
+        `[bg][vid]overlay=${ax}:${ay}[tmp]`,   // video na area
+        `[tmp][1:v]overlay=0:0[out]`,          // arte por cima (revela pelo furo)
+      ]
+    : [
+        `color=c=black:s=${cw}x${ch}:r=30:d=${dur}[bg]`,
+        videoStage,
+        `[bg][1:v]overlay=0:0[tmp]`,           // arte primeiro (preenche o fundo)
+        `[tmp][vid]overlay=${ax}:${ay}[out]`,  // video colado por cima, na area marcada
+      ];
+
   return new Promise((resolve, reject) => {
     ffmpeg()
       .input(sourceVideo)
       .input(mold.file_path)
       .inputOptions(['-loop 1']) // aplica ao ultimo input (a imagem do molde)
-      .complexFilter(
-        [
-          // fundo preto do tamanho do canvas, com a duracao do video
-          `color=c=black:s=${cw}x${ch}:r=30:d=${dur}[bg]`,
-          // video: escala para COBRIR a area e recorta o excesso, com pan (foco)
-          `[0:v]scale=${aw}:${ah}:force_original_aspect_ratio=increase,crop=${aw}:${ah}:(iw-${aw})*${fx.toFixed(4)}:(ih-${ah})*${fy.toFixed(4)},setsar=1,fps=30[vid]`,
-          // coloca o video na posicao da area
-          `[bg][vid]overlay=${ax}:${ay}[tmp]`,
-          // arte do molde por cima (o buraco transparente revela o video)
-          `[tmp][1:v]overlay=0:0[out]`,
-        ],
-        'out'
-      )
+      .complexFilter(filters, 'out')
       .outputOptions([
         '-map 0:a?',          // mantem o audio do video, se existir
         '-t', String(dur),    // limita a duracao do video original

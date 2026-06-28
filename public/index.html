@@ -21,7 +21,9 @@
         </div>
       </div>
       <nav>
-        <button data-tab="editor" class="active" data-title="Editor em massa" data-sub="Aplique seu molde em centenas de vídeos de uma vez.">
+        <button data-tab="inicio" class="active" data-title="Início" data-sub="Visão geral da sua operação no PagsDark.">
+          <span class="ico">🏠</span> Início</button>
+        <button data-tab="editor" data-title="Editor em massa" data-sub="Aplique seu molde em centenas de vídeos de uma vez.">
           <span class="ico">🎬</span> Editor em massa</button>
         <button data-tab="contas" data-title="Contas &amp; Workspaces" data-sub="Vincule suas redes e organize por workspace.">
           <span class="ico">🔗</span> Contas</button>
@@ -34,13 +36,50 @@
     <!-- ===== CONTEÚDO ===== -->
     <section class="content">
       <div class="topbar">
-        <h1 id="pageTitle">Editor em massa</h1>
-        <p id="pageSub">Aplique seu molde em centenas de vídeos de uma vez.</p>
+        <h1 id="pageTitle">Início</h1>
+        <p id="pageSub">Visão geral da sua operação no PagsDark.</p>
       </div>
       <main>
 
+        <!-- ============ INÍCIO (DASHBOARD) ============ -->
+        <section id="tab-inicio" class="tab active">
+          <div class="hero">
+            <h2>Bem-vindo de volta 👋</h2>
+            <p>Edite vídeos em massa com seu molde e deixe o agendador postar sozinho em YouTube, Instagram, Facebook e TikTok. Comece por um atalho abaixo.</p>
+            <span class="big">💸</span>
+          </div>
+
+          <div class="grid stats" id="dashStats"></div>
+
+          <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); margin-top:4px">
+            <div class="card action" data-go="editor">
+              <span class="ai">🎬</span>
+              <h4>Editar em massa</h4>
+              <p class="muted">Aplique o molde em centenas de vídeos e baixe em ZIP ou mande pra biblioteca.</p>
+              <span class="cta">Abrir editor →</span>
+            </div>
+            <div class="card action" data-go="contas">
+              <span class="ai">🔗</span>
+              <h4>Conectar redes</h4>
+              <p class="muted">Vincule YouTube, Instagram, Facebook e TikTok por workspace.</p>
+              <span class="cta">Gerenciar contas →</span>
+            </div>
+            <div class="card action" data-go="agendar">
+              <span class="ai">📅</span>
+              <h4>Agendar o mês</h4>
+              <p class="muted">Escolha vídeos, contas e horários fixos. O PagsDark posta sozinho.</p>
+              <span class="cta">Criar campanha →</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Próximos posts</h3>
+            <div id="dashNext"><p class="muted">Carregando…</p></div>
+          </div>
+        </section>
+
         <!-- ============ EDITOR ============ -->
-        <section id="tab-editor" class="tab active">
+        <section id="tab-editor" class="tab">
           <div class="hero">
             <h2>Transforme um lote inteiro em segundos 🎬</h2>
             <p>Envie um molde (arte 9:16) e seus vídeos. Cada vídeo é recortado e encaixado no molde, em massa. Baixe tudo em ZIP ou mande direto para o agendador.</p>
@@ -68,6 +107,10 @@
               </div>
               <button class="btn" id="videoUpload">Enviar vídeos</button>
             </div>
+            <div id="uploadProgress" class="hide" style="margin-top:14px">
+              <div class="row between"><span id="uploadLabel">Enviando…</span><span id="uploadPct">0%</span></div>
+              <div class="bar"><div id="uploadBar" style="width:0%"></div></div>
+            </div>
             <div class="row" style="margin-top:12px">
               <div style="flex:1; min-width:240px">
                 <label>…ou importar uma pasta inteira do Mac (ideal p/ centenas de vídeos)</label>
@@ -75,25 +118,42 @@
               </div>
               <button class="btn ghost" id="folderImport">Importar pasta</button>
             </div>
-            <p class="note" id="sourceCount" style="margin-top:14px">Nenhum vídeo carregado.</p>
+            <div class="row between" style="margin-top:14px">
+              <p class="note" id="sourceCount" style="margin:0; flex:1">Nenhum vídeo carregado.</p>
+              <button class="btn ghost sm" id="clearSources" style="display:none">🗑 Excluir todos</button>
+            </div>
             <div class="grid cols" id="sourceList" style="margin-top:14px"></div>
           </div>
 
           <div class="card">
             <h3><span class="step-n">3</span> Posicionar no molde</h3>
-            <p class="muted" id="previewHint" style="margin:0 0 16px">Selecione um molde e tenha um vídeo carregado para ver o preview e ajustar o enquadramento.</p>
+            <p class="muted" id="previewHint" style="margin:0 0 16px">Selecione um molde acima para definir onde o vídeo entra. (Carregue um vídeo para ver a prévia com imagem.)</p>
+            <div id="areaWarn" class="note hide" style="margin-bottom:16px; border-color:#5c4a1f; color:var(--warn)">⚠️ Este molde <b>não tem furo transparente</b>. Sem problema: escolha um <b>local predefinido</b> abaixo ou <b>arraste no preview</b> para marcar a área, e o vídeo será <b>colado por cima da arte</b> exatamente nessa área. (Se preferir que o vídeo apareça <i>pelo buraco</i> da arte, exporte o PNG com uma área transparente.)</div>
             <div class="row" style="align-items:flex-start; gap:26px">
-              <canvas id="previewCanvas" width="240" height="427" style="border-radius:12px; border:1px solid var(--line); background:#000"></canvas>
+              <div>
+                <canvas id="previewCanvas" width="240" height="427" style="border-radius:12px; border:1px solid var(--line); background:#000; cursor:crosshair"></canvas>
+                <p class="muted" style="font-size:12px; margin:8px 0 0; max-width:240px; text-align:center">Arraste sobre o preview para marcar a área do vídeo.</p>
+              </div>
               <div style="flex:1; min-width:240px">
-                <label>↔ Posição horizontal do vídeo</label>
+                <label>📍 Local predefinido do vídeo</label>
+                <div class="row presets" style="gap:8px">
+                  <button class="btn ghost sm" data-preset="center">⬛ Centro</button>
+                  <button class="btn ghost sm" data-preset="full">⬜ Inteiro</button>
+                  <button class="btn ghost sm" data-preset="top">⬆ Topo</button>
+                  <button class="btn ghost sm" data-preset="bottom">⬇ Base</button>
+                </div>
+                <button class="btn sm" id="saveArea" style="margin-top:10px">💾 Salvar área no molde</button>
+                <span class="chip ok hide" id="areaSaved" style="margin-left:8px">✓ área salva</span>
+
+                <label style="margin-top:20px">↔ Enquadramento horizontal (qual parte do vídeo aparece)</label>
                 <input type="range" id="focusX" min="0" max="100" value="50" />
-                <label>↕ Posição vertical do vídeo</label>
+                <label>↕ Enquadramento vertical</label>
                 <input type="range" id="focusY" min="0" max="100" value="50" />
                 <div class="row" style="margin-top:8px">
                   <button class="btn ghost sm" id="sampleNext">🔀 Trocar amostra</button>
                   <button class="btn ghost sm" id="centerFocus">🎯 Centralizar</button>
                 </div>
-                <p class="note" style="margin-top:14px">Esse enquadramento (pan) vale para <b>todos</b> os vídeos do lote. Arraste as barras e veja o resultado ao vivo no preview.</p>
+                <p class="note" style="margin-top:14px">A <b>área</b> define onde o vídeo aparece no molde; o <b>enquadramento</b> decide qual parte do vídeo fica visível. Ambos valem para <b>todos</b> os vídeos do lote.</p>
               </div>
             </div>
           </div>
@@ -189,7 +249,10 @@
               </div>
             </div>
 
-            <label style="margin-top:16px">Vídeos da biblioteca (renderizados). Sem seleção = todos.</label>
+            <div class="row between" style="margin-top:16px; align-items:flex-end">
+              <label style="margin:0">Vídeos da biblioteca (renderizados). Sem seleção = todos.</label>
+              <button class="btn ghost sm" id="clearLibrary" style="display:none">🗑 Excluir todos</button>
+            </div>
             <div class="grid cols" id="libList"></div>
 
             <div class="row between" style="margin-top:18px">
@@ -213,6 +276,7 @@
     </section>
   </div>
 
-  <script src="/app.js"></script>
+  <script type="module" src="/auth-guard.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

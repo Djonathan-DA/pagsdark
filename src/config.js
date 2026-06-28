@@ -14,6 +14,7 @@ export const DIRS = {
   media: path.join(DATA_DIR, 'media'),
   molds: path.join(DATA_DIR, 'molds'),
   output: path.join(DATA_DIR, 'output'),
+  thumbs: path.join(DATA_DIR, 'thumbs'),
   tmp: path.join(DATA_DIR, 'tmp'),
 };
 
@@ -41,6 +42,14 @@ export const config = {
   tiktok: {
     clientKey: pick('TIKTOK_CLIENT_KEY', 'tiktokClientKey'),
     clientSecret: pick('TIKTOK_CLIENT_SECRET', 'tiktokClientSecret'),
+  },
+
+  // Login dos usuários (Supabase: Google / e-mail+senha). Opcional: se vazio, o
+  // app roda em modo local sem exigir login. Preenchido, o login passa a valer.
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || '',
+    jwtSecret: process.env.SUPABASE_JWT_SECRET || '',
   },
 };
 
