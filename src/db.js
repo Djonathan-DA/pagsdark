@@ -106,6 +106,14 @@ CREATE TABLE IF NOT EXISTS posts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  pass_hash TEXT NOT NULL,           -- scrypt: salt:hash (hex)
+  name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_posts_due ON posts(status, scheduled_at);
 `);
 

@@ -7,6 +7,12 @@ const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
 
+// Silencia o ruido do Chromium no terminal (ex.: "trust_store_mac.cc ... Error
+// parsing certificate"): sao avisos inofensivos ao ler o chaveiro do macOS, nao
+// afetam o app. log-level=3 mostra apenas erros fatais.
+app.commandLine.appendSwitch('log-level', '3');
+app.commandLine.appendSwitch('disable-features', 'MacKeychainLookup');
+
 const ROOT = path.join(__dirname, '..');
 const PORT = process.env.PORT || 4310;
 const URL = `http://localhost:${PORT}`;

@@ -1,8 +1,20 @@
-# 🔐 Login dos usuários (Supabase + Google) — passo a passo
+# 🔐 Login dos usuários — passo a passo
 
-O PagsDark já vem com **tela de login pronta** (Google e e-mail+senha). Ela só
-**liga** quando você preenche as 3 variáveis do Supabase no `.env`. Enquanto
-estiverem vazias, o app roda em **modo local** (sem login), como antes.
+## Já funciona de cara (login local)
+O login **já vem ligado**. Ao abrir o app pela primeira vez você cai na **tela de
+login** em modo "Criar conta": defina e-mail e senha e pronto — sua conta fica
+salva no banco do app (senha guardada com scrypt, nunca em texto puro). A sessão
+dura 30 dias. Para **desligar** o login (abrir direto, sem senha), ponha `LOGIN=off`
+no `.env`.
+
+> Quer login com **Google** e usuários na **nuvem** (acessível de outro
+> computador)? Siga abaixo para ligar o Supabase. É **opcional**.
+
+---
+
+## Ligar o "Entrar com Google" (Supabase) — opcional
+Ao preencher as 3 variáveis do Supabase no `.env`, o app passa a usar o Supabase
+(Google + e-mail/senha na nuvem) no lugar do login local.
 
 > Por que Supabase? Ele já é o **banco de dados dos seus usuários** (guarda quem
 > tem acesso, com senha/Google, de forma segura) e cuida do login com Google sem

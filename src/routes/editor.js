@@ -7,8 +7,9 @@ import archiver from 'archiver';
 import { DIRS } from '../config.js';
 import { all, get, run, insert } from '../db.js';
 import { analyzeMold } from '../editor/mold.js';
-import { probe, makeThumbnail } from '../ffmpeg.js';
+import { probe } from '../ffmpeg.js';
 import { startBatch, jobStatus } from '../editor/batch.js';
+import { ensureThumb, warmThumbnails, thumbPathFor } from '../editor/thumbs.js';
 
 // Remove um arquivo do disco sem quebrar se ele nao existir.
 function safeUnlink(p) { try { if (p && fs.existsSync(p)) fs.unlinkSync(p); } catch {} }
@@ -85,6 +86,7 @@ router.post('/sources/upload', uploadVideos.array('videos', 1000), async (req, r
     created.push(await registerSource(finalPath, path.parse(f.originalname).name));
   }
   res.json(created);
+  warmThumbnails(); // pre-gera os thumbs em background (nao bloqueia a resposta)
 });
 
 // importar uma PASTA do disco (ideal para centenas de videos, sem copiar)
@@ -98,6 +100,7 @@ router.post('/sources/import-folder', express.json(), async (req, res) => {
     const created = [];
     for (const file of files) created.push(await registerSource(file, path.parse(file).name));
     res.json({ imported: created.length, items: created });
+    warmThumbnails(); // pre-gera os thumbs em background
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
@@ -116,14 +119,12 @@ async function registerSource(filePath, label) {
 // Substitui dezenas de <video> no navegador (era o que travava o PC ao subir muitos videos).
 router.get('/thumb/:id', async (req, res) => {
   const m = get('SELECT * FROM media_assets WHERE id = ?', [Number(req.params.id)]);
-  if (!m || !fs.existsSync(m.file_path)) return res.status(404).end();
-  const cached = m.thumb_path && fs.existsSync(m.thumb_path) ? m.thumb_path : null;
-  if (cached) { res.type('jpg'); return res.sendFile(path.resolve(cached)); }
-  const out = path.join(DIRS.thumbs, `thumb-${m.id}.jpg`);
+  if (!m) return res.status(404).end();
   try {
-    await makeThumbnail(m.file_path, out);
-    run('UPDATE media_assets SET thumb_path = ? WHERE id = ?', [out, m.id]);
+    const out = await ensureThumb(m);
+    if (!out) return res.status(404).end();
     res.type('jpg');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // o navegador cacheia o poster
     res.sendFile(path.resolve(out));
   } catch {
     res.status(404).end();
@@ -143,7 +144,8 @@ function isManaged(p) {
 function removeAsset(m) {
   if (!m) return;
   if (isManaged(m.file_path)) safeUnlink(m.file_path);
-  safeUnlink(m.thumb_path); // thumb fica sempre em data/thumbs -> seguro apagar
+  safeUnlink(m.thumb_path);          // thumb fica sempre em data/thumbs -> seguro apagar
+  safeUnlink(thumbPathFor(m.id));    // tambem o cache por id, caso thumb_path nao tenha sido salvo
   run('DELETE FROM media_assets WHERE id = ?', [m.id]);
 }
 
@@ -196,6 +198,26 @@ router.get('/job/:id/zip', (req, res) => {
   zip.pipe(res);
   zip.directory(job.output_dir, false);
   zip.finalize();
+});
+
+// "Salvar como": exporta os videos editados do job para uma PASTA escolhida.
+router.post('/job/:id/export', express.json(), (req, res) => {
+  try {
+    const job = get('SELECT * FROM render_jobs WHERE id = ?', [Number(req.params.id)]);
+    if (!job || !job.output_dir || !fs.existsSync(job.output_dir)) return res.status(404).json({ error: 'Job nao encontrado.' });
+    const dest = String(req.body.folder || '').trim();
+    if (!dest) return res.status(400).json({ error: 'Informe a pasta de destino.' });
+    fs.mkdirSync(dest, { recursive: true });
+    let copied = 0;
+    for (const name of fs.readdirSync(job.output_dir)) {
+      if (!/\.(mp4|mov|webm|mkv)$/i.test(name)) continue;
+      fs.copyFileSync(path.join(job.output_dir, name), path.join(dest, name));
+      copied++;
+    }
+    res.json({ ok: true, copied, folder: dest });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
 });
 
 // biblioteca de videos JA renderizados (usada pelo agendador)

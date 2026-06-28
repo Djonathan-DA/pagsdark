@@ -87,13 +87,16 @@ ffmpeg) — não usamos `<video>` na grade (travava o PC). Upload é feito em lo
 Excluir: `DELETE /sources/:id|/sources|/library/:id|/library|/molds/:id`. Vídeos
 importados por referência (pasta do Mac) só somem da lista — o original não é apagado.
 
-## Login e segurança (opcional, Supabase)
+## Login e segurança
 
-`src/auth.js` valida o JWT do Supabase no servidor; `public/login.html` faz o login
-(Google / e-mail+senha); `public/auth-guard.js` protege o app e mantém o cookie.
-Só liga se `SUPABASE_URL/ANON_KEY/JWT_SECRET` estiverem no `.env` (senão, modo local).
-Gate em `src/server.js`. Passo a passo: `SETUP-LOGIN.md`. O servidor escuta só em
-`127.0.0.1` e manda cabeçalhos de segurança.
+`src/auth.js`: login **local** (e-mail+senha na tabela `users`, scrypt + cookie de
+sessão assinado HMAC) — **ligado por padrão** (`LOGIN=off` desliga). Opcionalmente,
+**Google/nuvem** via Supabase (se `SUPABASE_URL/ANON_KEY/JWT_SECRET` no `.env`).
+`public/login.html`+`login.js` (detecta o modo), `public/auth-guard.js` mostra
+usuário/Sair. Gate em `src/server.js` (`authRequired()`): protege API, mídias e o
+app; `/auth/local/*`, `/auth/config`, `/public-media` e assets de login são públicos.
+Senha nunca em texto puro; segredos nunca vão ao cliente. Servidor só em `127.0.0.1`
++ cabeçalhos de segurança. Passo a passo: `SETUP-LOGIN.md`.
 
 ## Virar aplicativo (desktop, Electron)
 
@@ -103,8 +106,10 @@ editar os arquivos e reabrir continua funcionando normalmente.
 
 ## Banco de dados (tabelas)
 
-`workspaces`, `accounts`, `molds`, `media_assets`, `render_jobs`, `render_items`,
-`campaigns`, `posts`. Schema em `src/db.js`.
+`users`, `workspaces`, `accounts`, `molds`, `media_assets`, `render_jobs`,
+`render_items`, `campaigns`, `posts`. Schema em `src/db.js`. Thumbnails dos vídeos
+em `src/editor/thumbs.js` (poster JPG, pré-gerado em background + sob demanda).
+"Salvar como": `POST /api/editor/job/:id/export` copia o lote p/ uma pasta.
 
 ## O que funciona hoje vs. depende de aprovação
 

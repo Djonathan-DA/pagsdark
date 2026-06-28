@@ -167,9 +167,16 @@
             <div id="renderProgress" class="hide" style="margin-top:16px">
               <div class="row between"><span id="renderLabel">Renderizando…</span><span id="renderPct">0%</span></div>
               <div class="bar"><div id="renderBar" style="width:0%"></div></div>
-              <div class="row" style="margin-top:12px">
+              <div class="row" style="margin-top:12px; gap:10px">
                 <a class="btn sm" id="downloadZip" target="_blank">⬇ Baixar tudo (ZIP)</a>
                 <button class="btn sm ghost" id="goSchedule">Ir para o agendador →</button>
+              </div>
+              <div class="row" style="margin-top:12px; gap:10px; align-items:flex-end">
+                <div style="flex:1; min-width:220px">
+                  <label style="margin:0 0 6px">💾 Salvar como — exportar os vídeos para uma pasta do Mac</label>
+                  <input type="text" id="exportFolder" placeholder="/Users/voce/Desktop/editados" />
+                </div>
+                <button class="btn sm" id="exportBtn">💾 Salvar na pasta</button>
               </div>
             </div>
           </div>

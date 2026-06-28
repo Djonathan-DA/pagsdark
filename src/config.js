@@ -44,8 +44,13 @@ export const config = {
     clientSecret: pick('TIKTOK_CLIENT_SECRET', 'tiktokClientSecret'),
   },
 
-  // Login dos usuários (Supabase: Google / e-mail+senha). Opcional: se vazio, o
-  // app roda em modo local sem exigir login. Preenchido, o login passa a valer.
+  // Login dos usuários. Por padrão o login LOCAL (e-mail+senha, salvo no banco)
+  // está LIGADO — sempre aparece a tela de login. Desligue com LOGIN=off no .env.
+  // O Google é opcional e usa o Supabase (preencha as chaves abaixo).
+  auth: {
+    localEnabled: (process.env.LOGIN || 'on').toLowerCase() !== 'off',
+  },
+  // Google / sincronização de usuários na nuvem (Supabase). Opcional.
   supabase: {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY || '',

@@ -32,6 +32,7 @@ const state = {
   focusX: 50, focusY: 50, sampleIdx: 0,
   area: null,            // { x, y, w, h } em pixels do molde (onde o video entra)
   areaDirty: false,      // true quando o usuario mexeu na area e ainda nao salvou
+  lastJobId: null,       // ultimo lote renderizado (para "salvar como")
   activeWs: null,
   settings: null,
 };
@@ -152,9 +153,12 @@ async function loadSources() {
   refreshPreview();
 }
 async function delSource(m) {
-  await api('DELETE', '/api/editor/sources/' + m.id);
-  state.selSources.delete(m.id);
-  loadSources();
+  try {
+    await api('DELETE', '/api/editor/sources/' + m.id);
+    state.selSources.delete(m.id);
+    toast('Vídeo removido.', 'ok');
+    loadSources();
+  } catch (e) { toast('Não consegui excluir: ' + e.message, 'err'); }
 }
 // Thumbnail leve: usa o poster JPG gerado no servidor (nada de dezenas de <video>).
 function mediaThumb(m, selSet, reload, onDelete) {
@@ -213,7 +217,9 @@ $('#folderImport').onclick = async () => {
 };
 
 // ---- Preview interativo (canvas) ----
-const pv = { moldId: null, sampleId: null, img: null, video: null, imgReady: false, vidReady: false };
+// Usa o POSTER JPG do video (mesmo do grid) em vez de um <video> oculto:
+// confiavel, rapido e identico ao que o render vai gerar.
+const pv = { moldId: null, sampleId: null, img: null, sampleImg: null, imgReady: false, sampleReady: false };
 function currentMold() { return state.molds.find((m) => m.id === state.selMold) || null; }
 function currentSample() {
   const list = state.selSources.size ? state.sourcesArr.filter((s) => state.selSources.has(s.id)) : state.sourcesArr;
@@ -243,15 +249,24 @@ function refreshPreview() {
   }
   const sample = currentSample();
   if (sample && pv.sampleId !== sample.id) {
-    pv.sampleId = sample.id; pv.vidReady = false;
-    if (!pv.video) { pv.video = document.createElement('video'); pv.video.muted = true; pv.video.playsInline = true; }
-    pv.video.onloadeddata = () => { try { pv.video.currentTime = Math.min(1, (pv.video.duration || 2) / 2); } catch (e) {} };
-    pv.video.onseeked = () => { pv.vidReady = true; drawPreview(); };
-    pv.video.src = '/preview/' + sample.id; pv.video.load();
+    pv.sampleId = sample.id; pv.sampleReady = false;
+    pv.sampleImg = new Image();
+    pv.sampleImg.onload = () => { pv.sampleReady = true; drawPreview(); };
+    pv.sampleImg.onerror = () => { pv.sampleReady = false; drawPreview(); };
+    pv.sampleImg.src = '/api/editor/thumb/' + sample.id;
   } else if (!sample) {
-    pv.sampleId = null; pv.vidReady = false;
+    pv.sampleId = null; pv.sampleReady = false; pv.sampleImg = null;
   }
   drawPreview();
+}
+function drawSampleInArea(ctx, ax, ay, aw, ah) {
+  if (!pv.sampleReady || !pv.sampleImg || !pv.sampleImg.naturalWidth) return;
+  const vw = pv.sampleImg.naturalWidth, vh = pv.sampleImg.naturalHeight;
+  const cover = Math.max(aw / vw, ah / vh), dw = vw * cover, dh = vh * cover;
+  const offX = (dw - aw) * (state.focusX / 100), offY = (dh - ah) * (state.focusY / 100);
+  ctx.save(); ctx.beginPath(); ctx.rect(ax, ay, aw, ah); ctx.clip();
+  ctx.drawImage(pv.sampleImg, ax - offX, ay - offY, dw, dh);
+  ctx.restore();
 }
 function drawPreview() {
   const canvas = $('#previewCanvas'); if (!canvas) return;
@@ -259,17 +274,19 @@ function drawPreview() {
   const ctx = canvas.getContext('2d');
   const s = canvas.width / mold.canvas_w;
   const ax = state.area.x * s, ay = state.area.y * s, aw = state.area.w * s, ah = state.area.h * s;
+  const opaque = mold.has_alpha === 0;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#000'; ctx.fillRect(ax, ay, aw, ah);
-  if (pv.vidReady && pv.video.videoWidth) {
-    const vw = pv.video.videoWidth, vh = pv.video.videoHeight;
-    const cover = Math.max(aw / vw, ah / vh), dw = vw * cover, dh = vh * cover;
-    const offX = (dw - aw) * (state.focusX / 100), offY = (dh - ah) * (state.focusY / 100);
-    ctx.save(); ctx.beginPath(); ctx.rect(ax, ay, aw, ah); ctx.clip();
-    ctx.drawImage(pv.video, ax - offX, ay - offY, dw, dh);
-    ctx.restore();
+  if (opaque) {
+    // molde opaco: arte primeiro, video colado por cima na area (igual ao render)
+    if (pv.imgReady) ctx.drawImage(pv.img, 0, 0, canvas.width, canvas.height);
+    else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    drawSampleInArea(ctx, ax, ay, aw, ah);
+  } else {
+    // molde com furo: video na area, arte por cima (aparece pelo buraco)
+    ctx.fillStyle = '#000'; ctx.fillRect(ax, ay, aw, ah);
+    drawSampleInArea(ctx, ax, ay, aw, ah);
+    if (pv.imgReady) ctx.drawImage(pv.img, 0, 0, canvas.width, canvas.height);
   }
-  if (pv.imgReady) ctx.drawImage(pv.img, 0, 0, canvas.width, canvas.height);
   // contorno da area por cima de tudo, para o usuario ver onde o video entra
   ctx.save();
   ctx.strokeStyle = '#ff7a18'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
@@ -358,10 +375,22 @@ $('#renderBtn').onclick = async () => {
       moldId: state.selMold, sourceIds: [...state.selSources],
       focusX: state.focusX, focusY: state.focusY,
     });
+    state.lastJobId = jobId;
     $('#renderProgress').classList.remove('hide');
     $('#downloadZip').href = `/api/editor/job/${jobId}/zip`;
     pollJob(jobId);
   } catch (e) { toast(e.message, 'err'); }
+};
+$('#exportBtn').onclick = async () => {
+  if (!state.lastJobId) return toast('Renderize um lote primeiro.', 'err');
+  const folder = $('#exportFolder').value.trim();
+  if (!folder) return toast('Informe a pasta de destino.', 'err');
+  $('#exportBtn').disabled = true;
+  try {
+    const r = await api('POST', `/api/editor/job/${state.lastJobId}/export`, { folder });
+    toast(`${r.copied} vídeo(s) salvos em ${r.folder}`, 'ok');
+  } catch (e) { toast('Não consegui salvar: ' + e.message, 'err'); }
+  finally { $('#exportBtn').disabled = false; }
 };
 async function pollJob(jobId) {
   const j = await api('GET', `/api/editor/job/${jobId}`);

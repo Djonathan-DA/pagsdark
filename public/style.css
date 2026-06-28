@@ -141,9 +141,9 @@ button.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-sh
 .thumb .pick { position: absolute; top: 7px; right: 7px; width: 22px; height: 22px; border-radius: 50%; background: #000a; display: grid; place-items: center; font-size: 12px; opacity: .5; transition: all .15s; }
 .thumb.sel .pick { background: var(--orange); opacity: 1; }
 .thumb .name { position: absolute; bottom: 0; left: 0; right: 0; font-size: 11px; padding: 14px 7px 5px; background: linear-gradient(0deg, #000d, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.thumb .del { position: absolute; top: 7px; left: 7px; width: 24px; height: 24px; border-radius: 50%; background: #000b; color: #fff; border: none; cursor: pointer; font-size: 13px; display: grid; place-items: center; opacity: 0; transition: opacity .15s, background .15s; z-index: 3; }
+.thumb .del { position: absolute; top: 7px; left: 7px; width: 26px; height: 26px; border-radius: 50%; background: rgba(220,40,70,.85); color: #fff; border: 1px solid #fff4; cursor: pointer; font-size: 14px; font-weight: 700; line-height: 1; display: grid; place-items: center; opacity: .9; transition: opacity .15s, background .15s, transform .15s; z-index: 4; box-shadow: 0 2px 8px #0008; }
 .thumb:hover .del { opacity: 1; }
-.thumb .del:hover { background: var(--err); }
+.thumb .del:hover { background: var(--err); transform: scale(1.12); }
 .thumb-ph { width: 100%; height: 100%; display: grid; place-items: center; font-size: 30px; background: #0d0a08; }
 
 /* ===== Dashboard (Início) ===== */
