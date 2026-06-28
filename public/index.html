@@ -102,6 +102,19 @@
           </div>
 
           <div class="card">
+            <h3><span class="step-n">🎵</span> Áudio de fundo (opcional)</h3>
+            <p class="muted" style="margin:0 0 12px">Adicione uma trilha. No vídeo pronto ela entra a <b>35% de volume</b>, junto com o som original. Selecione um áudio para usar no lote — ou deixe <b>nenhum</b>.</p>
+            <div class="row">
+              <div style="flex:1; min-width:240px">
+                <label>Arquivo de áudio (MP3, M4A, WAV…)</label>
+                <input type="file" id="audioFile" accept="audio/*" />
+              </div>
+              <button class="btn" id="audioUpload">Enviar áudio</button>
+            </div>
+            <div id="audioList" style="margin-top:16px"></div>
+          </div>
+
+          <div class="card">
             <h3><span class="step-n">2</span> Vídeos</h3>
             <div class="row">
               <div style="flex:1; min-width:240px">
@@ -195,7 +208,10 @@
             <h3><span class="step-n">5</span> Vídeos prontos (no molde)</h3>
             <div class="row between">
               <p class="muted" id="renderedHint" style="margin:0; flex:1">Cada vídeo já editado aparece aqui, recortado dentro do molde. <b>Clique para assistir</b>. Durante a renderização eles surgem um a um.</p>
-              <button class="btn ghost sm" id="refreshRendered">↻ Atualizar</button>
+              <div class="row" style="gap:8px">
+                <button class="btn ghost sm" id="refreshRendered">↻ Atualizar</button>
+                <button class="btn ghost sm" id="clearRendered">🗑 Limpar tudo</button>
+              </div>
             </div>
             <div class="grid cols" id="renderedGrid" style="margin-top:14px"></div>
           </div>

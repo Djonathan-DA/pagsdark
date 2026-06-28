@@ -80,6 +80,29 @@ router.delete('/molds/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Audios (trilha extra, aplicada a 35% no render) ----
+const uploadAudio = multer({ dest: DIRS.audios });
+router.get('/audios', (_req, res) => {
+  res.json(all("SELECT * FROM media_assets WHERE kind = 'audio' ORDER BY id DESC"));
+});
+router.post('/audios', uploadAudio.single('audio'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Envie um arquivo de áudio no campo "audio".' });
+    const ext = path.extname(req.file.originalname).toLowerCase() || '.mp3';
+    const finalPath = path.join(DIRS.audios, `audio-${Date.now()}${ext}`);
+    fs.renameSync(req.file.path, finalPath);
+    const id = insert("INSERT INTO media_assets (kind, file_path, label) VALUES ('audio',?,?)",
+      [finalPath, path.parse(req.file.originalname).name]);
+    res.json(get('SELECT * FROM media_assets WHERE id = ?', [id]));
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
+router.delete('/audios/:id', (req, res) => {
+  removeAsset(get("SELECT * FROM media_assets WHERE id = ? AND kind = 'audio'", [Number(req.params.id)]));
+  res.json({ ok: true });
+});
+
 // ---- Videos-fonte ----
 router.get('/sources', (_req, res) => {
   res.json(all("SELECT * FROM media_assets WHERE kind = 'source' ORDER BY id DESC"));
@@ -174,7 +197,7 @@ router.delete('/sources', (_req, res) => {
 // ---- Renderizacao em lote ----
 router.post('/render', express.json(), (req, res) => {
   try {
-    const { moldId, sourceIds, focusX, focusY } = req.body;
+    const { moldId, sourceIds, focusX, focusY, audioId } = req.body;
     if (!moldId) return res.status(400).json({ error: 'Escolha um molde.' });
     const ids = Array.isArray(sourceIds) && sourceIds.length
       ? sourceIds
@@ -184,7 +207,13 @@ router.post('/render', express.json(), (req, res) => {
       .filter(Boolean)
       .map((r) => r.file_path);
     if (!sources.length) return res.status(400).json({ error: 'Nenhum video para renderizar.' });
-    const jobId = startBatch({ moldId, sources, focus: { x: focusX, y: focusY } });
+    // trilha de audio opcional (entra a 35%)
+    let audioPath = null;
+    if (audioId) {
+      const a = get("SELECT file_path FROM media_assets WHERE id = ? AND kind = 'audio'", [audioId]);
+      if (a) audioPath = a.file_path;
+    }
+    const jobId = startBatch({ moldId, sources, focus: { x: focusX, y: focusY }, audioPath });
     res.json({ jobId });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });

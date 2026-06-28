@@ -32,6 +32,7 @@ const state = {
   focusX: 50, focusY: 50, sampleIdx: 0,
   area: null,            // { x, y, w, h } em pixels do molde (onde o video entra)
   areaDirty: false,      // true quando o usuario mexeu na area e ainda nao salvou
+  selAudio: null,        // id do audio de fundo selecionado (ou null = sem trilha)
   lastJobId: null,       // ultimo lote renderizado (para "salvar como")
   activeWs: null,
   settings: null,
@@ -133,6 +134,39 @@ $('#moldUpload').onclick = async () => {
     if (m.area_auto) toast(`Molde adicionado: área transparente detectada ${m.area_w}×${m.area_h}.`, 'ok');
     else toast('Molde adicionado (PNG opaco). No passo 3, marque onde o vídeo entra — ele será colado nessa área.', 'ok');
   } catch (e) { toast(e.message, 'err'); }
+};
+
+// ---- Áudio de fundo (entra a 35% no render) ----
+async function loadAudios() {
+  const box = $('#audioList'); if (!box) return;
+  let audios = [];
+  try { audios = await api('GET', '/api/editor/audios'); } catch {}
+  if (!audios.length) { box.innerHTML = '<p class="muted">Nenhum áudio enviado. O lote sai sem trilha extra.</p>'; return; }
+  box.innerHTML = '';
+  audios.forEach((a) => {
+    const d = document.createElement('div');
+    d.className = 'ws-item' + (state.selAudio === a.id ? ' active' : '');
+    d.innerHTML = `<span>${state.selAudio === a.id ? '<span class="star">♪ usando</span> ' : '🎵 '}<b>${a.label || ('#' + a.id)}</b></span>
+      <button class="btn sm ghost" onclick="event.stopPropagation();delAudio(${a.id})">Excluir</button>`;
+    d.onclick = () => { state.selAudio = state.selAudio === a.id ? null : a.id; loadAudios(); };
+    box.appendChild(d);
+  });
+}
+$('#audioUpload').onclick = async () => {
+  const f = $('#audioFile').files[0];
+  if (!f) return toast('Escolha um arquivo de áudio.', 'err');
+  const fd = new FormData(); fd.append('audio', f);
+  try {
+    const a = await api('POST', '/api/editor/audios', fd, true);
+    state.selAudio = a.id; $('#audioFile').value = '';
+    toast('Áudio adicionado e selecionado (35% no vídeo).', 'ok');
+    loadAudios();
+  } catch (e) { toast(e.message, 'err'); }
+};
+window.delAudio = async (id) => {
+  await api('DELETE', '/api/editor/audios/' + id);
+  if (state.selAudio === id) state.selAudio = null;
+  loadAudios();
 };
 
 async function loadSources() {
@@ -397,6 +431,7 @@ $('#renderBtn').onclick = async () => {
     const { jobId } = await api('POST', '/api/editor/render', {
       moldId: state.selMold, sourceIds: [...state.selSources],
       focusX: state.focusX, focusY: state.focusY,
+      audioId: state.selAudio,
     });
     state.lastJobId = jobId;
     $('#renderProgress').classList.remove('hide');
@@ -463,6 +498,17 @@ function closePlayer() {
 $('#playerClose').onclick = closePlayer;
 $('#playerModal .modal-bg').onclick = closePlayer;
 $('#refreshRendered').onclick = loadRendered;
+$('#clearRendered').onclick = async () => {
+  if (!confirm('Limpar TODOS os vídeos prontos? Use para começar um novo projeto. (Não afeta os vídeos carregados nem o molde.)')) return;
+  try {
+    await api('DELETE', '/api/editor/library');
+    state.selLib.clear();
+    state.lastJobId = null;
+    toast('Vídeos prontos limpos. Pronto para um novo projeto.', 'ok');
+    loadRendered();
+    loadInicio();
+  } catch (e) { toast(e.message, 'err'); }
+};
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePlayer(); });
 
 // ===================== CONTAS (guiado) =====================
@@ -745,5 +791,6 @@ $('#clearLibrary').onclick = async () => {
 // ===== Init =====
 loadInicio();
 loadMolds();
+loadAudios();
 loadSources();
 loadRendered();

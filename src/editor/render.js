@@ -4,8 +4,9 @@ import { ffmpeg, probe } from '../ffmpeg.js';
 
 // mold = { file_path, canvas_w, canvas_h, area_x, area_y, area_w, area_h }
 // focus = { x, y } em 0..100 -> onde o video fica enquadrado na area (pan).
-export async function renderOne(sourceVideo, mold, outputPath, focus = {}) {
-  const { duration } = await probe(sourceVideo);
+// audioFile (opcional) = trilha extra que entra a 35% de volume, em loop.
+export async function renderOne(sourceVideo, mold, outputPath, focus = {}, audioFile = null) {
+  const { duration, hasAudio } = await probe(sourceVideo);
   const dur = duration && duration > 0 ? duration : 60;
 
   const cw = mold.canvas_w, ch = mold.canvas_h;
@@ -36,14 +37,32 @@ export async function renderOne(sourceVideo, mold, outputPath, focus = {}) {
         `[tmp][vid]overlay=${ax}:${ay}[out]`,  // video colado por cima, na area marcada
       ];
 
+  // Audio: se tem trilha extra, ela entra a 35% (input 2, em loop). Mixa com o
+  // audio original do video, se existir.
+  let audioMap;
+  if (audioFile) {
+    if (hasAudio) {
+      filters.push('[2:a]volume=0.35[m]');
+      filters.push('[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]');
+    } else {
+      filters.push('[2:a]volume=0.35[aout]');
+    }
+    audioMap = ['-map', '[aout]'];
+  } else {
+    audioMap = ['-map', '0:a?']; // mantem o audio do video, se existir
+  }
+
   return new Promise((resolve, reject) => {
-    ffmpeg()
+    const cmd = ffmpeg()
       .input(sourceVideo)
       .input(mold.file_path)
-      .inputOptions(['-loop 1']) // aplica ao ultimo input (a imagem do molde)
-      .complexFilter(filters, 'out')
+      .inputOptions(['-loop 1']); // aplica ao molde (imagem)
+    if (audioFile) cmd.input(audioFile).inputOptions(['-stream_loop', '-1']); // loopa a trilha
+    cmd
+      .complexFilter(filters)
       .outputOptions([
-        '-map 0:a?',          // mantem o audio do video, se existir
+        '-map', '[out]',
+        ...audioMap,
         '-t', String(dur),    // limita a duracao do video original
         '-c:v', 'libx264',
         '-preset', 'veryfast',

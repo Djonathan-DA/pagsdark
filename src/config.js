@@ -13,6 +13,7 @@ export const DIRS = {
   data: DATA_DIR,
   media: path.join(DATA_DIR, 'media'),
   molds: path.join(DATA_DIR, 'molds'),
+  audios: path.join(DATA_DIR, 'audios'),
   output: path.join(DATA_DIR, 'output'),
   thumbs: path.join(DATA_DIR, 'thumbs'),
   tmp: path.join(DATA_DIR, 'tmp'),

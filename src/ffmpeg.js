@@ -30,11 +30,13 @@ export function probe(file) {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(file, (err, data) => {
       if (err) return reject(err);
-      const stream = (data.streams || []).find((s) => s.codec_type === 'video') || {};
+      const streams = data.streams || [];
+      const stream = streams.find((s) => s.codec_type === 'video') || {};
       resolve({
         duration: Number(data.format?.duration || stream.duration || 0),
         width: Number(stream.width || 0),
         height: Number(stream.height || 0),
+        hasAudio: streams.some((s) => s.codec_type === 'audio'),
       });
     });
   });
