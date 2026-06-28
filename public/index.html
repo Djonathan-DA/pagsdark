@@ -35,9 +35,12 @@
 
     <!-- ===== CONTEÚDO ===== -->
     <section class="content">
-      <div class="topbar">
-        <h1 id="pageTitle">Início</h1>
-        <p id="pageSub">Visão geral da sua operação no PagsDark.</p>
+      <div class="topbar row between" style="align-items:center">
+        <div>
+          <h1 id="pageTitle">Início</h1>
+          <p id="pageSub">Visão geral da sua operação no PagsDark.</p>
+        </div>
+        <a href="/logout" id="topLogout" class="btn ghost sm hide" title="Sair e voltar para a tela de login">🚪 Sair</a>
       </div>
       <main>
 
@@ -180,6 +183,15 @@
               </div>
             </div>
           </div>
+
+          <div class="card">
+            <h3><span class="step-n">5</span> Vídeos prontos (no molde)</h3>
+            <div class="row between">
+              <p class="muted" id="renderedHint" style="margin:0; flex:1">Cada vídeo já editado aparece aqui, recortado dentro do molde. <b>Clique para assistir</b>. Durante a renderização eles surgem um a um.</p>
+              <button class="btn ghost sm" id="refreshRendered">↻ Atualizar</button>
+            </div>
+            <div class="grid cols" id="renderedGrid" style="margin-top:14px"></div>
+          </div>
         </section>
 
         <!-- ============ CONTAS ============ -->
@@ -281,6 +293,15 @@
 
       </main>
     </section>
+  </div>
+
+  <!-- Player para assistir o vídeo pronto -->
+  <div id="playerModal" class="modal hide">
+    <div class="modal-bg"></div>
+    <div class="modal-box">
+      <button id="playerClose" class="modal-close" title="Fechar">✕</button>
+      <video id="playerVideo" controls playsinline></video>
+    </div>
   </div>
 
   <script type="module" src="/auth-guard.js"></script>

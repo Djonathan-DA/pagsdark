@@ -401,10 +401,46 @@ async function pollJob(jobId) {
   $('#renderLabel').textContent = j.status === 'done'
     ? `Concluído: ${j.done}/${j.total}${failed ? ` (${failed} com erro)` : ''}`
     : `Renderizando… ${j.done}/${j.total}`;
+  loadRendered(); // os prontos vao aparecendo um a um na galeria abaixo
   if (j.status !== 'done') setTimeout(() => pollJob(jobId), 1500);
-  else toast('Renderização concluída! Vídeos na biblioteca.', 'ok');
+  else toast('Renderização concluída! Veja os vídeos prontos abaixo.', 'ok');
 }
 $('#goSchedule').onclick = () => $$('nav button').find((b) => b.dataset.tab === 'agendar').click();
+
+// ---- Vídeos prontos (galeria de resultados, já no molde) ----
+async function loadRendered() {
+  const box = $('#renderedGrid'); if (!box) return;
+  let lib = [];
+  try { lib = await api('GET', '/api/editor/library'); } catch {}
+  box.innerHTML = '';
+  if (!lib.length) { box.innerHTML = '<p class="muted">Nenhum vídeo pronto ainda. Renderize um lote acima — eles aparecem aqui um a um.</p>'; return; }
+  lib.slice(0, MAX_THUMBS).forEach((m) => {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img loading="lazy" src="/api/editor/thumb/${m.id}" alt="" />
+      <span class="play">▶</span><span class="name">${m.label || ('#' + m.id)}</span>`;
+    d.onclick = () => openPlayer(m.id);
+    box.appendChild(d);
+  });
+  if (lib.length > MAX_THUMBS) {
+    const p = document.createElement('p'); p.className = 'muted';
+    p.textContent = `+${lib.length - MAX_THUMBS} vídeos prontos (todos vão para o agendador).`;
+    box.appendChild(p);
+  }
+}
+function openPlayer(id) {
+  const v = $('#playerVideo'); v.src = '/preview/' + id;
+  $('#playerModal').classList.remove('hide');
+  v.play().catch(() => {});
+}
+function closePlayer() {
+  const v = $('#playerVideo'); v.pause(); v.removeAttribute('src'); v.load();
+  $('#playerModal').classList.add('hide');
+}
+$('#playerClose').onclick = closePlayer;
+$('#playerModal .modal-bg').onclick = closePlayer;
+$('#refreshRendered').onclick = loadRendered;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePlayer(); });
 
 // ===================== CONTAS (guiado) =====================
 const GUIDES = {
@@ -687,3 +723,4 @@ $('#clearLibrary').onclick = async () => {
 loadInicio();
 loadMolds();
 loadSources();
+loadRendered();

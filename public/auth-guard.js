@@ -3,6 +3,9 @@
 // Em modo local o servidor já protege tudo; aqui só montamos usuário + botão Sair.
 const cfg = await (await fetch('/auth/config')).json();
 
+// Botão de Sair no topo (visível quando o login está exigido).
+if (cfg.required) document.getElementById('topLogout')?.classList.remove('hide');
+
 function mountUserBox(email, onLogout) {
   const footEl = document.querySelector('.sidebar .foot');
   if (!footEl) return;

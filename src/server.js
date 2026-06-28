@@ -88,9 +88,15 @@ app.get('/mold-file/:id', (req, res) => {
   res.sendFile(path.resolve(m.file_path));
 });
 
-// Interface (HTML/CSS/JS)
-app.use(express.static(path.join(ROOT, 'public')));
-app.get('*', (_req, res) => res.sendFile(path.join(ROOT, 'public', 'index.html')));
+// Interface (HTML/CSS/JS). no-cache nos assets de codigo: o navegador SEMPRE
+// revalida (via ETag) — evita rodar JS antigo em cache depois de uma atualizacao.
+app.use(express.static(path.join(ROOT, 'public'), {
+  setHeaders: (res, p) => { if (/\.(js|css|html)$/i.test(p)) res.setHeader('Cache-Control', 'no-cache'); },
+}));
+app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(ROOT, 'public', 'index.html'));
+});
 
 // Vincula apenas ao localhost: o app e local e nao deve ficar exposto na rede.
 app.listen(config.port, '127.0.0.1', () => {
