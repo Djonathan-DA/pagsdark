@@ -13,6 +13,7 @@
     "dev": "node --no-warnings --watch src/server.js",
     "app": "electron electron/main.cjs",
     "dist": "electron-builder",
+    "tunnel": "node scripts/tunnel.mjs",
     "daemon:install": "bash scripts/install-daemon.sh",
     "daemon:uninstall": "bash scripts/uninstall-daemon.sh",
     "daemon:status": "launchctl list | grep com.pagsdark.server || echo 'daemon nao esta rodando'"
